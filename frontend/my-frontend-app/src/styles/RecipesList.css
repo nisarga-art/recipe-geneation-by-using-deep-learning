@@ -1,0 +1,419 @@
+/* -- Page wrapper ------------------------------------------- */
+.rl-page {
+  min-height: 100vh;
+  background: #f5f7fb;
+  font-family: "Inter", "Segoe UI", sans-serif;
+}
+
+/* -- Header ------------------------------------------------- */
+.rl-header {
+  text-align: center;
+  padding: 48px 24px 24px;
+}
+
+.rl-title {
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 8px;
+}
+
+.rl-subtitle {
+  color: #6b7280;
+  font-size: 1rem;
+  margin: 0;
+}
+
+/* -- Filter Bar --------------------------------------------- */
+.rl-filter-bar {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rl-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.rl-filter-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+  min-width: 68px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rl-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rl-pill {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1.5px solid #e5e7eb;
+  background: #fff;
+  color: #374151;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.rl-pill:hover {
+  border-color: #ff5a00;
+  color: #ff5a00;
+}
+
+.rl-pill.active {
+  background: #ff5a00;
+  border-color: #ff5a00;
+  color: #fff;
+}
+
+/* -- Recipe Count ------------------------------------------- */
+.rl-count {
+  max-width: 1280px;
+  margin: 0 auto 20px;
+  padding: 0 24px;
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+.rl-count strong {
+  color: #ff5a00;
+}
+
+/* -- Grid --------------------------------------------------- */
+.rl-grid {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px 60px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+@media (max-width: 960px) {
+  .rl-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .rl-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* -- Card --------------------------------------------------- */
+.rl-card {
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+
+.rl-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 28px rgba(255, 90, 0, 0.15);
+}
+
+/* -- Card image --------------------------------------------- */
+.rl-card-img-wrap {
+  position: relative;
+  height: 200px;
+  overflow: hidden;
+}
+
+.rl-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s;
+}
+
+.rl-card:hover .rl-card-img {
+  transform: scale(1.05);
+}
+
+.rl-cuisine-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(255, 90, 0, 0.9);
+  color: #fff;
+  font-size: 0.73rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+  backdrop-filter: blur(4px);
+  letter-spacing: 0.03em;
+}
+
+/* -- Card body ---------------------------------------------- */
+.rl-card-body {
+  padding: 18px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.rl-card-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 10px;
+}
+
+/* -- Meta tags ---------------------------------------------- */
+.rl-card-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.rl-meta-tag {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 10px;
+}
+
+.rl-meal {
+  background: #fff0e6;
+  color: #b34000;
+}
+
+.rl-diet {
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 10px;
+}
+
+/* -- Card info row ------------------------------------------ */
+.rl-card-info {
+  display: flex;
+  gap: 14px;
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.rl-card-info span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* -- Navbar favorites icon ---------------------------------- */
+.rl-nav-fav {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.rl-nav-fav-btn {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: #fff0e6;
+  color: #e53e3e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.15s;
+  padding: 0;
+}
+
+.rl-nav-fav-btn:hover,
+.rl-nav-fav-btn.open {
+  background: #ffe0cc;
+  transform: scale(1.08);
+}
+
+.rl-nav-fav-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #ff5a00;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+}
+
+/* -- Favorites dropdown panel ------------------------------- */
+.rl-fav-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 320px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.14);
+  z-index: 200;
+  overflow: hidden;
+  animation: rl-fade-drop 0.18s ease;
+}
+
+@keyframes rl-fade-drop {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.rl-fav-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.rl-fav-panel-count {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.rl-fav-panel-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.87rem;
+  margin: 0;
+}
+
+.rl-fav-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.rl-fav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  transition: background 0.12s;
+}
+
+.rl-fav-item:hover {
+  background: #fdf6f0;
+}
+
+.rl-fav-item-img {
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.rl-fav-item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rl-fav-item-title {
+  font-size: 0.87rem;
+  font-weight: 600;
+  color: #1a1a2e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rl-fav-item-cuisine {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.rl-fav-item-remove {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: #f3f4f6;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  padding: 0;
+}
+
+.rl-fav-item-remove:hover {
+  background: #fee2e2;
+  color: #e53e3e;
+}
+
+/* -- Card favorite button ----------------------------------- */
+.rl-fav-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.15s;
+  padding: 0;
+}
+
+.rl-fav-btn:hover {
+  background: rgba(0, 0, 0, 0.55);
+  transform: scale(1.12);
+}
+
+.rl-fav-btn.active {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+/* -- Empty state -------------------------------------------- */
+.rl-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 60px 24px;
+  color: #9ca3af;
+  font-size: 1rem;
+}

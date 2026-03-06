@@ -1,0 +1,491 @@
+/* ===== PAGE ===== */
+.nd-page {
+  min-height: 100vh;
+  background: #f7f7fb;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+/* ===== NAVBAR ===== */
+.nd-navbar {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  padding: 0 32px;
+  height: 64px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.nd-logo {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #ff6a00;
+  white-space: nowrap;
+}
+
+.nd-nav-links {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+
+.nd-nav-links a {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: #555;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.nd-nav-links a:hover,
+.nd-nav-links a.nd-nav-active {
+  background: #fff4ed;
+  color: #ff6a00;
+}
+
+.nd-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f3f4f6;
+  border-radius: 999px;
+  padding: 7px 16px;
+  min-width: 240px;
+}
+
+.nd-search-box input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.88rem;
+  color: #333;
+  width: 100%;
+}
+
+.nd-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #fff4ed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ===== CONTENT ===== */
+.nd-content {
+  max-width: 840px;
+  margin: 0 auto;
+  padding: 32px 24px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ===== BACK BUTTON ===== */
+.nd-back {
+  background: none;
+  border: none;
+  color: #ff6a00;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nd-back:hover {
+  text-decoration: underline;
+}
+
+/* ===== HEADER CARD ===== */
+.nd-header-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 28px;
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  border: 1px solid #f0f0f0;
+}
+
+.nd-header-emoji {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.9rem;
+  flex-shrink: 0;
+}
+
+.nd-header-name {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #111;
+  margin: 0 0 12px;
+}
+
+.nd-header-desc {
+  font-size: 0.92rem;
+  color: #444;
+  line-height: 1.7;
+  margin: 0;
+}
+
+/* ===== DAILY REQUIREMENT ===== */
+.nd-daily-req {
+  background: #fff8f0;
+  border-radius: 14px;
+  padding: 20px 24px;
+  border: 1px solid #ffe4c4;
+}
+
+.nd-dr-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  color: #111;
+  margin-bottom: 8px;
+}
+
+.nd-daily-req p {
+  font-size: 0.9rem;
+  color: #555;
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* ===== SECTIONS ===== */
+.nd-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.nd-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #111;
+  margin: 0;
+}
+
+/* ===== BENEFITS LIST ===== */
+.nd-benefits-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nd-benefits-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.92rem;
+  color: #444;
+  line-height: 1.5;
+}
+
+.nd-benefits-list li svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* ===== FOOD SOURCES ===== */
+.nd-sources-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #fff;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid #ebebeb;
+}
+
+.nd-source-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #ebebeb;
+  background: #fff;
+  transition: background 0.1s;
+}
+
+.nd-source-item:hover {
+  background: #fafafa;
+}
+
+.nd-source-item:nth-child(odd) {
+  border-right: 1px solid #ebebeb;
+}
+
+/* remove bottom border from last two items (bottom row) */
+.nd-source-item:nth-last-child(1),
+.nd-source-item:nth-last-child(2) {
+  border-bottom: none;
+}
+
+.nd-source-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.nd-source-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.nd-source-serving {
+  font-size: 0.78rem;
+  color: #aaa;
+}
+
+.nd-source-amount {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+/* ===== DEFICIENCY ===== */
+.nd-deficiency {
+  background: #fff5f5;
+  border-radius: 14px;
+  padding: 22px 24px;
+  border: 1px solid #ffd6d6;
+}
+
+.nd-deficiency-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #111;
+  margin: 0 0 14px;
+}
+
+.nd-deficiency-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nd-deficiency-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  color: #444;
+}
+
+.nd-def-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  flex-shrink: 0;
+}
+
+/* ===== TIPS ===== */
+.nd-tips {
+  background: #f0f6ff;
+  border-radius: 14px;
+  padding: 22px 24px;
+  border: 1px solid #c7ddf9;
+}
+
+.nd-tips-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #111;
+  margin: 0 0 16px;
+}
+
+.nd-tips-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.nd-tips-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 0.9rem;
+  color: #444;
+  line-height: 1.55;
+}
+
+.nd-tip-num {
+  min-width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #3b82f6;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ===== DID YOU KNOW ===== */
+.nd-facts {
+  background: #f5f0ff;
+  border-radius: 14px;
+  padding: 22px 24px;
+  border: 1px solid #ddd6fe;
+}
+
+.nd-facts-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #111;
+  margin: 0 0 16px;
+}
+
+.nd-facts-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.nd-fact-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.nd-fact-num {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.nd-fact-item p {
+  font-size: 0.9rem;
+  color: #444;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ===== NUTRIENT INTERACTIONS ===== */
+.nd-interactions {
+  background: #f0fdf4;
+  border-radius: 14px;
+  padding: 22px 24px;
+  border: 1px solid #bbf7d0;
+}
+
+.nd-interactions-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #111;
+  margin: 0 0 6px;
+}
+
+.nd-interactions-sub {
+  font-size: 0.85rem;
+  color: #666;
+  margin: 0 0 18px;
+}
+
+.nd-interactions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.nd-interaction-item {
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px 16px;
+  border: 1px solid #d1fae5;
+}
+
+.nd-interaction-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.nd-interaction-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.nd-badge-enhances {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.nd-badge-inhibits {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.nd-badge-neutral {
+  background: #f3f4f6;
+  color: #555;
+}
+
+.nd-interaction-nutrient {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #111;
+}
+
+.nd-interaction-desc {
+  font-size: 0.87rem;
+  color: #555;
+  margin: 0;
+  line-height: 1.6;
+}
