@@ -287,6 +287,219 @@ border-color:#ff6a00;
 color:#ff6a00;
 }
 
+/* Analyze button */
+.upload-analyze-btn{
+display:inline-flex;
+align-items:center;
+gap:7px;
+background:linear-gradient(135deg,#ff6a00,#ee0979);
+color:#fff;
+border:none;
+border-radius:8px;
+padding:7px 18px;
+font-size:0.85rem;
+font-weight:700;
+cursor:pointer;
+box-shadow:0 3px 10px rgba(255,106,0,0.35);
+transition:transform 0.15s,box-shadow 0.15s;
+}
+.upload-analyze-btn:hover:not(:disabled){
+transform:translateY(-1px);
+box-shadow:0 5px 16px rgba(255,106,0,0.45);
+}
+.upload-analyze-btn:disabled{
+opacity:0.75;
+cursor:not-allowed;
+}
+.upload-analyze-spinner{
+display:inline-block;
+width:13px;
+height:13px;
+border:2px solid rgba(255,255,255,0.4);
+border-top-color:#fff;
+border-radius:50%;
+animation:spin 0.75s linear infinite;
+}
+@keyframes spin{ to{ transform:rotate(360deg); } }
+
+/* Analyzing loading bar */
+.analyze-loading{
+background:#fff8f3;
+border:1.5px solid #ff6a00;
+border-radius:12px;
+padding:18px 22px;
+margin-bottom:26px;
+text-align:center;
+color:#ff6a00;
+font-weight:600;
+font-size:0.95rem;
+}
+.analyze-loading-bar{
+height:4px;
+border-radius:4px;
+background:linear-gradient(90deg,#ff6a00,#ee0979,#ff6a00);
+background-size:200% 100%;
+animation:shimmer 1.4s linear infinite;
+margin-bottom:12px;
+}
+@keyframes shimmer{ 0%{background-position:100%} 100%{background-position:-100%} }
+
+/* Analysis result panel */
+.analyze-result{
+background:#fff;
+border:1.5px solid #ff6a00;
+border-radius:16px;
+margin-bottom:30px;
+overflow:hidden;
+box-shadow:0 4px 20px rgba(255,106,0,0.12);
+}
+.analyze-result-header{
+display:flex;
+justify-content:space-between;
+align-items:center;
+padding:12px 20px;
+background:linear-gradient(135deg,#ff6a00,#ee0979);
+}
+.analyze-result-badge{
+color:#fff;
+font-weight:700;
+font-size:0.92rem;
+}
+.analyze-result-close{
+background:rgba(255,255,255,0.25);
+border:none;
+border-radius:50%;
+width:26px;
+height:26px;
+color:#fff;
+font-size:13px;
+cursor:pointer;
+display:flex;
+align-items:center;
+justify-content:center;
+}
+.analyze-result-body{
+display:flex;
+gap:0;
+flex-wrap:wrap;
+}
+.analyze-result-img{
+width:320px;
+max-width:100%;
+object-fit:cover;
+flex-shrink:0;
+}
+.analyze-result-info{
+padding:22px;
+flex:1;
+min-width:260px;
+display:flex;
+flex-direction:column;
+gap:14px;
+}
+.analyze-result-title{
+font-size:1.5rem;
+font-weight:800;
+color:#1a1a1a;
+margin:0;
+}
+.analyze-result-tags{
+display:flex;
+flex-wrap:wrap;
+gap:8px;
+}
+.ar-tag{
+padding:4px 12px;
+border-radius:20px;
+font-size:0.78rem;
+font-weight:600;
+}
+.ar-tag-cuisine{ background:#fff3e0;color:#e65100; }
+.ar-tag-diet{ background:#e8f5e9;color:#2e7d32; }
+.ar-tag-meal{ background:#e3f2fd;color:#1565c0; }
+.ar-tag-diff{ background:#fce4ec;color:#c62828; }
+.analyze-result-meta{
+display:flex;
+gap:20px;
+}
+.ar-meta-item{
+font-size:0.9rem;
+color:#555;
+}
+.analyze-result-nutrition{
+display:flex;
+gap:16px;
+flex-wrap:wrap;
+}
+.ar-nutr{
+background:#f9fafb;
+border:1px solid #e5e7eb;
+border-radius:10px;
+padding:8px 14px;
+text-align:center;
+min-width:60px;
+}
+.ar-nutr-val{
+display:block;
+font-size:1rem;
+font-weight:700;
+color:#ff6a00;
+}
+.ar-nutr-label{
+display:block;
+font-size:0.72rem;
+color:#888;
+margin-top:2px;
+}
+.analyze-result-section h4{
+margin:0 0 8px;
+font-size:0.9rem;
+color:#333;
+font-weight:700;
+}
+.ar-ingredients{
+display:flex;
+flex-wrap:wrap;
+gap:8px;
+}
+.ar-ing{
+padding:4px 12px;
+border-radius:20px;
+font-size:0.78rem;
+font-weight:500;
+}
+.ar-ing-available{ background:#dcfce7;color:#15803d; }
+.ar-ing-missing{ background:#fee2e2;color:#b91c1c; }
+.ar-steps{
+padding-left:18px;
+margin:0;
+display:flex;
+flex-direction:column;
+gap:6px;
+font-size:0.85rem;
+color:#444;
+line-height:1.5;
+}
+.ar-cultural{
+font-size:0.85rem;
+color:#555;
+font-style:italic;
+margin:0;
+}
+.ar-view-full-btn{
+align-self:flex-start;
+background:linear-gradient(135deg,#ff6a00,#ee0979);
+color:#fff;
+border:none;
+border-radius:8px;
+padding:10px 22px;
+font-size:0.9rem;
+font-weight:700;
+cursor:pointer;
+transition:transform 0.15s;
+}
+.ar-view-full-btn:hover{ transform:translateY(-1px); }
+
 .subtitle{
 color:#666;
 margin-bottom:20px;

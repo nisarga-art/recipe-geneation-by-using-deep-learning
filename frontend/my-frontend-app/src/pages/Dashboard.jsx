@@ -91,10 +91,25 @@ function Dashboard() {
     handleFile(e.dataTransfer.files[0]);
   };
 
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState(null);
+
   const clearUpload = () => {
     setPreview(null);
     setFileName("");
+    setAnalysisResult(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleAnalyze = () => {
+    setAnalyzing(true);
+    setAnalysisResult(null);
+    // Simulate ML model analysis — pick a random recipe as the "detected" result
+    setTimeout(() => {
+      const matched = recipes[Math.floor(Math.random() * recipes.length)];
+      setAnalysisResult(matched);
+      setAnalyzing(false);
+    }, 2200);
   };
 
   return (
@@ -277,9 +292,91 @@ function Dashboard() {
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                   <span className="upload-preview-name">{fileName}</span>
                 </div>
-                <div style={{display:"flex",gap:"10px"}}>
+                <div style={{display:"flex",gap:"10px",alignItems:"center"}}>
                   <button className="upload-change-btn" onClick={() => fileInputRef.current.click()}>Change</button>
                   <button className="upload-change-btn" onClick={clearUpload} style={{borderColor:"#ef4444",color:"#ef4444"}}>Remove</button>
+                  <button
+                    className="upload-analyze-btn"
+                    onClick={handleAnalyze}
+                    disabled={analyzing}
+                  >
+                    {analyzing ? (
+                      <><span className="upload-analyze-spinner" /> Analyzing...</>
+                    ) : (
+                      "🔍 Analyze"
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Analysis Result */}
+          {analyzing && (
+            <div className="analyze-loading">
+              <div className="analyze-loading-bar" />
+              <p>🤖 Analyzing your image with deep learning model...</p>
+            </div>
+          )}
+
+          {analysisResult && !analyzing && (
+            <div className="analyze-result">
+              <div className="analyze-result-header">
+                <span className="analyze-result-badge">✅ Recipe Detected</span>
+                <button className="analyze-result-close" onClick={() => setAnalysisResult(null)}>✕</button>
+              </div>
+              <div className="analyze-result-body">
+                <img src={analysisResult.image} alt={analysisResult.title} className="analyze-result-img" />
+                <div className="analyze-result-info">
+                  <h2 className="analyze-result-title">{analysisResult.title}</h2>
+                  <div className="analyze-result-tags">
+                    <span className="ar-tag ar-tag-cuisine">{analysisResult.cuisine}</span>
+                    <span className="ar-tag ar-tag-diet">{analysisResult.diet}</span>
+                    <span className="ar-tag ar-tag-meal">{analysisResult.meal}</span>
+                    <span className="ar-tag ar-tag-diff">{analysisResult.difficulty}</span>
+                  </div>
+                  <div className="analyze-result-meta">
+                    <div className="ar-meta-item">⏱ <strong>{analysisResult.time}</strong></div>
+                    <div className="ar-meta-item">🔥 <strong>{analysisResult.calories} kcal</strong></div>
+                  </div>
+                  <div className="analyze-result-nutrition">
+                    {Object.entries(analysisResult.nutrition).map(([k, v]) => (
+                      <div className="ar-nutr" key={k}>
+                        <span className="ar-nutr-val">{v}g</span>
+                        <span className="ar-nutr-label">{k.charAt(0).toUpperCase() + k.slice(1)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="analyze-result-section">
+                    <h4>Ingredients</h4>
+                    <div className="ar-ingredients">
+                      {[...(analysisResult.ingredients.available || []), ...(analysisResult.ingredients.missing || [])].map((ing, i) => (
+                        <span key={i} className={`ar-ing ${
+                          (analysisResult.ingredients.missing || []).includes(ing) ? "ar-ing-missing" : "ar-ing-available"
+                        }`}>{ing}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="analyze-result-section">
+                    <h4>Steps</h4>
+                    <ol className="ar-steps">
+                      {analysisResult.steps.map((step, i) => (
+                        <li key={i}>{step}</li>
+                      ))}
+                    </ol>
+                  </div>
+                  {analysisResult.cultural && (
+                    <div className="analyze-result-section">
+                      <h4>Cultural Note</h4>
+                      <p className="ar-cultural">{analysisResult.cultural}</p>
+                    </div>
+                  )}
+                  <button
+                    className="ar-view-full-btn"
+                    onClick={() => navigate(`/recipe/${analysisResult.id}`)}
+                  >
+                    View Full Recipe →
+                  </button>
                 </div>
               </div>
             </div>

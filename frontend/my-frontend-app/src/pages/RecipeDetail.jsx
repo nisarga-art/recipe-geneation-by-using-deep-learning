@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import recipes from "../data/recipes";
 import "../styles/RecipeDetail.css";
@@ -80,6 +80,102 @@ function RecipeDetail() {
   const navigate = useNavigate();
   const recipe = recipes[Number(id)];
   const [buyItem, setBuyItem] = useState(null);
+
+  // ── Voice Assistant ──────────────────────────────────────
+  // currentStep: -1 = idle, -2 = intro, 0+ = step index
+  const [voiceActive, setVoiceActive] = useState(false);
+  const [voicePaused, setVoicePaused] = useState(false);
+  const [currentStep, setCurrentStep] = useState(-1);
+  const keepAliveRef = useRef(null);
+
+  // Cleanup on unmount
+  useEffect(() => () => {
+    window.speechSynthesis.cancel();
+    if (keepAliveRef.current) clearInterval(keepAliveRef.current);
+  }, []);
+
+  // React-state-driven speech: fires whenever voiceActive or currentStep changes
+  useEffect(() => {
+    if (!voiceActive || currentStep === -1) return;
+
+    // All steps finished
+    if (currentStep >= recipe.steps.length) {
+      if (keepAliveRef.current) clearInterval(keepAliveRef.current);
+      setVoiceActive(false);
+      setCurrentStep(-1);
+      return;
+    }
+
+    const isIntro = currentStep === -2;
+    const text = isIntro
+      ? `Let's prepare ${recipe.title}. I will guide you through each step.`
+      : `Step ${currentStep + 1}. ${recipe.steps[currentStep]}`;
+
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.rate = 0.9;
+    utter.volume = 1;
+    // No lang override — uses browser/system default for best compatibility
+    utter.onend = () => setCurrentStep(prev => (prev === -2 ? 0 : prev + 1));
+    utter.onerror = (e) => {
+      if (e.error !== "interrupted") {
+        if (keepAliveRef.current) clearInterval(keepAliveRef.current);
+        setVoiceActive(false);
+        setCurrentStep(-1);
+      }
+    };
+    window.speechSynthesis.speak(utter);
+
+    // Cleanup cancels the current utterance when step changes (prevents overlap)
+    return () => window.speechSynthesis.cancel();
+  }, [voiceActive, currentStep]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const startVoice = () => {
+    if (!window.speechSynthesis) { alert("Your browser does not support voice."); return; }
+    window.speechSynthesis.cancel();
+    // Chrome keep-alive: Chrome silently stops synthesis after ~15s without this
+    if (keepAliveRef.current) clearInterval(keepAliveRef.current);
+    keepAliveRef.current = setInterval(() => {
+      if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+        window.speechSynthesis.pause();
+        window.speechSynthesis.resume();
+      }
+    }, 10000);
+    setVoicePaused(false);
+    setVoiceActive(true);
+    setCurrentStep(-2); // triggers intro utterance via useEffect
+  };
+
+  const stopVoice = () => {
+    window.speechSynthesis.cancel();
+    if (keepAliveRef.current) clearInterval(keepAliveRef.current);
+    setVoiceActive(false);
+    setVoicePaused(false);
+    setCurrentStep(-1);
+  };
+
+  const pauseVoice = () => {
+    window.speechSynthesis.pause();
+    setVoicePaused(true);
+  };
+
+  const resumeVoice = () => {
+    window.speechSynthesis.resume();
+    setVoicePaused(false);
+  };
+
+  const skipStep = () => {
+    window.speechSynthesis.cancel();
+    setCurrentStep(prev => {
+      const next = prev === -2 ? 0 : prev + 1;
+      return next >= recipe.steps.length ? recipe.steps.length : next;
+    });
+  };
+
+  const prevStep = () => {
+    window.speechSynthesis.cancel();
+    setCurrentStep(prev => Math.max(0, prev === -2 ? 0 : prev - 1));
+  };
+  // ────────────────────────────────────────────────────────
 
   if (!recipe) {
     return <div className="rd-notfound">Recipe not found.</div>;
@@ -177,12 +273,52 @@ function RecipeDetail() {
 
           {/* Cooking Instructions */}
           <div className="rd-card">
-            <h2 className="rd-section-title">Cooking Instructions</h2>
+            <div className="rd-instructions-header">
+              <h2 className="rd-section-title" style={{margin:0}}>Cooking Instructions</h2>
+              {!voiceActive ? (
+                <button className="rd-voice-start-btn" onClick={startVoice}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1a4 4 0 0 1 4 4v7a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm0 2a2 2 0 0 0-2 2v7a2 2 0 0 0 4 0V5a2 2 0 0 0-2-2zm-7 8a1 1 0 0 1 1 1 7 7 0 0 0 14 0 1 1 0 1 1 2 0 9 9 0 0 1-8 8.94V22h3a1 1 0 1 1 0 2H7a1 1 0 1 1 0-2h3v-1.06A9 9 0 0 1 2 12a1 1 0 0 1 1-1z"/></svg>
+                  🎙 Start Voice Guide
+                </button>
+              ) : (
+                <button className="rd-voice-stop-btn" onClick={stopVoice}>
+                  ✕ Stop Voice
+                </button>
+              )}
+            </div>
+
+            {/* Voice Player Bar */}
+            {voiceActive && (
+              <div className="rd-voice-bar">
+                <div className="rd-voice-bar-info">
+                  <span className="rd-voice-wave">
+                    {[1,2,3,4,5].map(n => (
+                      <span key={n} className={`rd-wave-bar${voicePaused ? " paused" : ""}`} style={{animationDelay:`${n * 0.1}s`}} />
+                    ))}
+                  </span>
+                  <span className="rd-voice-status">
+                    {voicePaused ? "Paused" : currentStep >= 0 ? `Speaking Step ${currentStep + 1} of ${recipe.steps.length}` : "Preparing..."}
+                  </span>
+                </div>
+                <div className="rd-voice-controls">
+                  <button className="rd-vc-btn" onClick={prevStep} title="Previous step">⏮</button>
+                  {voicePaused
+                    ? <button className="rd-vc-btn rd-vc-play" onClick={resumeVoice} title="Resume">▶ Resume</button>
+                    : <button className="rd-vc-btn rd-vc-pause" onClick={pauseVoice} title="Pause">⏸ Pause</button>
+                  }
+                  <button className="rd-vc-btn" onClick={skipStep} title="Next step">⏭</button>
+                </div>
+              </div>
+            )}
+
             <ol className="rd-steps">
               {recipe.steps.map((step, i) => (
-                <li key={i}>
+                <li key={i} className={currentStep === i ? "rd-step-active" : ""}>
                   <span className="rd-step-num">{i + 1}</span>
                   <span className="rd-step-text">{step}</span>
+                  {currentStep === i && (
+                    <span className="rd-step-speaking-badge">🔊 Speaking...</span>
+                  )}
                 </li>
               ))}
             </ol>
