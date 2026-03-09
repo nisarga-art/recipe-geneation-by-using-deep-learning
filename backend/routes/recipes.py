@@ -28,14 +28,50 @@ def get_all_recipes(
     if difficulty:
         query = query.filter(Recipe.difficulty.ilike(f"%{difficulty}%"))
     if search:
+        search = search.strip().lower()
         query = query.filter(Recipe.title.ilike(f"%{search}%"))
 
-    return query.all()
+    local_results = query.all()
 
+    if search:
+        # Always also fetch from TheMealDB when searching
+        external_recipes = []
+        try:
+            url = f"https://www.themealdb.com/api/json/v1/1/search.php?s={search}"
+            print(f"Fetching from TheMealDB: {url}")
+            response = requests.get(url, timeout=5)
+            print(f"TheMealDB status: {response.status_code}")
+            data = response.json()
+            meals = data.get("meals", [])
+            print(f"TheMealDB meals count: {len(meals) if meals else 0}")
+            local_titles = {r.title.lower() for r in local_results}
+            for meal in meals or []:
+                # Avoid duplicates already in local DB
+                if meal.get("strMeal", "").lower() not in local_titles:
+                    external_recipes.append(RecipeOut(
+                        id=None,
+                        title=meal.get("strMeal", "Unknown"),
+                        cuisine=meal.get("strArea", "Unknown"),
+                        diet="Unknown",
+                        time="Unknown",
+                        calories=None,
+                        difficulty="Unknown",
+                        meal=meal.get("strCategory", "Unknown"),
+                        image=meal.get("strMealThumb", None),
+                        pantry_match=None,
+                        cultural=meal.get("strTags", None),
+                        ingredients=None,
+                        nutrition=None,
+                        health_benefits=None,
+                        steps=[meal.get("strInstructions", "")],
+                        similar_dishes=None,
+                        food_labels=None,
+                    ))
+        except Exception as e:
+            print(f"TheMealDB fetch error: {e}")
 
-@router.get("/{recipe_id}", response_model=RecipeOut)
-def get_recipe(recipe_id: int, db: Session = Depends(get_db)):
-    recipe = db.query(Recipe).filter(Recipe.id == recipe_id).first()
-    if not recipe:
-        raise HTTPException(status_code=404, detail="Recipe not found")
-    return recipe
+        # Combine local + external results
+        return list(local_results) + external_recipes
+
+    # If not searching, return all local results
+    return local_results

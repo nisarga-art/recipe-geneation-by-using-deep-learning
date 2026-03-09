@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import ProfileDropdown from "../components/ProfileDropdown";
-import allRecipes from "../data/allRecipes";
 import "../styles/RecipesList.css";
 
 const CUISINES = [
@@ -32,6 +31,8 @@ const DIET_COLORS = {
 
 export default function RecipesList() {
   const navigate = useNavigate();
+  const [recipes, setRecipes] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeCuisine, setActiveCuisine] = useState("All");
   const [activeDiet, setActiveDiet] = useState("All");
@@ -43,6 +44,25 @@ export default function RecipesList() {
   const favRef = useRef(null);
 
   useEffect(() => {
+    const params = new URLSearchParams();
+    if (search) params.append("search", search);
+    if (activeCuisine !== "All") params.append("cuisine", activeCuisine);
+    if (activeDiet !== "All") params.append("diet", activeDiet);
+
+    setLoading(true);
+    fetch(`http://127.0.0.1:8000/recipes?${params.toString()}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setRecipes(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch recipes:", err);
+        setLoading(false);
+      });
+  }, [search, activeCuisine, activeDiet]);
+
+  useEffect(() => {
     const handler = (e) => {
       if (favRef.current && !favRef.current.contains(e.target)) setFavOpen(false);
     };
@@ -50,7 +70,7 @@ export default function RecipesList() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const favRecipes = allRecipes.filter((r) => favorites.includes(r.id));
+  const favRecipes = recipes.filter((r) => favorites.includes(r.id));
 
   const toggleFav = (id) => {
     setFavorites((prev) => {
@@ -60,19 +80,8 @@ export default function RecipesList() {
     });
   };
 
-  const filtered = allRecipes.filter((r) => {
-    const q = search.toLowerCase();
-    const matchSearch =
-      !q ||
-      r.title.toLowerCase().includes(q) ||
-      r.cuisine.toLowerCase().includes(q) ||
-      r.diet.toLowerCase().includes(q) ||
-      r.meal.toLowerCase().includes(q);
-    const matchCuisine =
-      activeCuisine === "All" || r.cuisine === activeCuisine;
-    const matchDiet = activeDiet === "All" || r.diet === activeDiet;
-    return matchSearch && matchCuisine && matchDiet;
-  });
+  // Backend handles all filtering, recipes are already filtered
+  const filtered = recipes;
 
   return (
     <div className="rl-page">
@@ -158,7 +167,7 @@ export default function RecipesList() {
       <div className="rl-header">
         <h1 className="rl-title">All Recipes</h1>
         <p className="rl-subtitle">
-          Explore {allRecipes.length}+ recipes from cuisines around the world
+          Explore {recipes.length}+ recipes from cuisines around the world
         </p>
       </div>
 
@@ -196,12 +205,14 @@ export default function RecipesList() {
 
       {/* ── Recipe Count ────────────────────────────────────── */}
       <div className="rl-count">
-        Showing <strong>{filtered.length}</strong> of {allRecipes.length} recipes
+        Showing <strong>{filtered.length}</strong> of {recipes.length} recipes
       </div>
 
       {/* ── Recipe Grid ─────────────────────────────────────── */}
       <div className="rl-grid">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="rl-empty" style={{textAlign:"center",padding:"2rem"}}>🔍 Searching recipes...</div>
+        ) : filtered.length === 0 ? (
           <div className="rl-empty">No recipes match your filters. Try a different search.</div>
         ) : (
           filtered.map((r) => (
