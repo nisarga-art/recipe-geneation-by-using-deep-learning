@@ -72,3 +72,28 @@ class AnalyzeResult(BaseModel):
     confidence_scores: List[float]
     matched_recipe: Optional[RecipeOut]
     message: str
+
+
+# ── Health Planner ────────────────────────────────────────
+class HealthPlanRequest(BaseModel):
+    health_issues: List[str] = []
+    diet_goal: Optional[str] = None
+    meal_type: Optional[str] = None
+    preferences: Optional[str] = None
+    avoid_ingredients: List[str] = []
+    max_prep_time: Optional[int] = None
+
+
+class FoodRecommendation(BaseModel):
+    name: str
+    reason: str
+    usage: str
+
+
+class HealthPlanResponse(BaseModel):
+    summary: str
+    recommended_foods: List[FoodRecommendation]
+    avoid_foods: List[str]
+    recipes: List[RecipeOut]
+    lifestyle_tips: List[str]
+    disclaimer: str

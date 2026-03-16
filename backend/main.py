@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
 import models  # ensures all tables are registered before create_all
-from routes import analyze, recipes, auth
+from routes import analyze, recipes, auth, health_plan
 
 # Create all DB tables on startup
 Base.metadata.create_all(bind=engine)
@@ -26,6 +26,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(recipes.router)
 app.include_router(analyze.router)
+app.include_router(health_plan.router)
 
 
 @app.get("/", tags=["Health"])

@@ -8,7 +8,7 @@ const allRecipes = [
     calories: 320,
     difficulty: "Easy",
     meal: "Breakfast",
-    image: "https://images.unsplash.com/photo-1630383249896-483b1fbf7f9e?w=600&q=80",
+    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Rameshwaram_Cafe_Dosa.jpg/330px-Rameshwaram_Cafe_Dosa.jpg",
   },
   {
     id: 1,
@@ -19,7 +19,7 @@ const allRecipes = [
     calories: 520,
     difficulty: "Medium",
     meal: "Dinner",
-    image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=600&q=80",
+    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/Shahi_panner.jpg/330px-Shahi_panner.jpg",
   },
   {
     id: 2,
@@ -41,7 +41,7 @@ const allRecipes = [
     calories: 650,
     difficulty: "Hard",
     meal: "Lunch",
-    image: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=600&q=80",
+    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/%22Hyderabadi_Dum_Biryani%22.jpg/330px-%22Hyderabadi_Dum_Biryani%22.jpg",
   },
   {
     id: 4,
@@ -96,7 +96,7 @@ const allRecipes = [
     calories: 580,
     difficulty: "Medium",
     meal: "Dinner",
-    image: "https://images.unsplash.com/photo-1588166524941-3bf61a9c41db?w=600&q=80",
+    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Butter_Chicken_%26_Butter_Naan_-_Home_-_Chandigarh_-_India_-_0006.jpg/330px-Butter_Chicken_%26_Butter_Naan_-_Home_-_Chandigarh_-_India_-_0006.jpg",
   },
   {
     id: 9,
@@ -184,7 +184,7 @@ const allRecipes = [
     calories: 430,
     difficulty: "Medium",
     meal: "Dinner",
-    image: "https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=600&q=80",
+    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/Punjabi_style_Dal_Makhani.jpg/330px-Punjabi_style_Dal_Makhani.jpg",
   },
   {
     id: 17,
@@ -209,17 +209,6 @@ const allRecipes = [
     image: "https://images.unsplash.com/photo-1561043433-aaf687c4cf04?w=600&q=80",
   },
   {
-    id: 19,
-    title: "Avocado Toast",
-    cuisine: "Western",
-    diet: "Vegan",
-    time: "10 minutes",
-    calories: 220,
-    difficulty: "Easy",
-    meal: "Breakfast",
-    image: "https://images.unsplash.com/photo-1588137378633-dea1336ce1e2?w=600&q=80",
-  },
-  {
     id: 20,
     title: "Lamb Kebabs",
     cuisine: "Middle Eastern",
@@ -239,7 +228,7 @@ const allRecipes = [
     calories: 280,
     difficulty: "Easy",
     meal: "Breakfast",
-    image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=600&q=80",
+    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/11/Idli_Sambar.JPG/330px-Idli_Sambar.JPG",
   },
   {
     id: 22,
@@ -283,7 +272,7 @@ const allRecipes = [
     calories: 580,
     difficulty: "Medium",
     meal: "Breakfast",
-    image: "https://images.unsplash.com/photo-1606491956689-2ea866880c84?w=600&q=80",
+    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Chole_Bhature_from_Nagpur.JPG/330px-Chole_Bhature_from_Nagpur.JPG",
   },
   {
     id: 26,
@@ -316,7 +305,7 @@ const allRecipes = [
     calories: 390,
     difficulty: "Medium",
     meal: "Dinner",
-    image: "https://images.unsplash.com/photo-1604152135912-04a022e23696?w=600&q=80",
+    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Palakpaneer_Rayagada_Odisha_0009.jpg/330px-Palakpaneer_Rayagada_Odisha_0009.jpg",
   },
   {
     id: 29,
@@ -338,7 +327,7 @@ const allRecipes = [
     calories: 560,
     difficulty: "Medium",
     meal: "Dinner",
-    image: "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=600&q=80",
+    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Triangle_paratha_%28cropped%29.JPG/330px-Triangle_paratha_%28cropped%29.JPG",
   },
   {
     id: 31,

@@ -30,7 +30,7 @@ const menus = [
     calories: 1200,
     image: "https://images.unsplash.com/photo-1525351484163-7529414344d8?w=600&q=80",
     courses: [
-      { name: "Main", items: ["Avocado Toast with Poached Eggs", "Greek Yogurt Parfait", "Spinach & Feta Omelette"] },
+      { name: "Main", items: ["Idli Sambar", "Greek Yogurt Parfait", "Spinach & Feta Omelette"] },
       { name: "Beverage", items: ["Fresh Orange Juice", "Green Smoothie"] },
       { name: "Side", items: ["Mixed Berry Bowl", "Whole Grain Toast"] }
     ]

@@ -84,6 +84,17 @@ function HealthGuide() {
   const [result, setResult]         = useState(null);
   const [dragOver, setDragOver]     = useState(false);
   const [search, setSearch]         = useState("");
+  const [plannerLoading, setPlannerLoading] = useState(false);
+  const [plannerError, setPlannerError] = useState("");
+  const [plannerResult, setPlannerResult] = useState(null);
+  const [plannerForm, setPlannerForm] = useState({
+    healthIssues: "",
+    dietGoal: "",
+    mealType: "",
+    avoidIngredients: "",
+    preferences: "",
+    maxPrepTime: "",
+  });
 
   const visibleNutrients = search
     ? nutrients.filter(n =>
@@ -111,6 +122,50 @@ function HealthGuide() {
     e.preventDefault();
     setDragOver(false);
     handleFile(e.dataTransfer.files[0]);
+  };
+
+  const updatePlannerField = (key, value) => {
+    setPlannerForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const submitHealthPlanner = async (e) => {
+    e.preventDefault();
+    setPlannerLoading(true);
+    setPlannerError("");
+
+    const payload = {
+      health_issues: plannerForm.healthIssues
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+      diet_goal: plannerForm.dietGoal || null,
+      meal_type: plannerForm.mealType || null,
+      preferences: plannerForm.preferences || null,
+      avoid_ingredients: plannerForm.avoidIngredients
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+      max_prep_time: plannerForm.maxPrepTime ? Number(plannerForm.maxPrepTime) : null,
+    };
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/health-plan/recommendations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error("Could not generate recommendations right now.");
+      }
+
+      const data = await response.json();
+      setPlannerResult(data);
+    } catch (error) {
+      setPlannerError(error.message || "Failed to load recommendations.");
+    } finally {
+      setPlannerLoading(false);
+    }
   };
 
   return (
@@ -143,6 +198,162 @@ function HealthGuide() {
       </div>
 
       <div className="hg-content">
+
+        <div className="hg-plan-card">
+          <h2 className="hg-plan-title">Health & Diet Planner</h2>
+          <p className="hg-plan-subtitle">
+            Tell us your health issues or diet goal and get food recommendations with recipes you can cook now.
+          </p>
+
+          <form className="hg-plan-form" onSubmit={submitHealthPlanner}>
+            <label>
+              Health Issues
+              <textarea
+                placeholder="Example: diabetes, cholesterol, acidity"
+                value={plannerForm.healthIssues}
+                onChange={(e) => updatePlannerField("healthIssues", e.target.value)}
+              />
+            </label>
+
+            <label>
+              Diet Goal
+              <select
+                value={plannerForm.dietGoal}
+                onChange={(e) => updatePlannerField("dietGoal", e.target.value)}
+              >
+                <option value="">Select a goal</option>
+                <option value="weight loss">Weight Loss</option>
+                <option value="muscle gain">Muscle Gain</option>
+                <option value="diabetic friendly">Diabetic Friendly</option>
+                <option value="heart healthy">Heart Healthy</option>
+                <option value="high protein">High Protein</option>
+                <option value="vegan">Vegan</option>
+                <option value="vegetarian">Vegetarian</option>
+              </select>
+            </label>
+
+            <label>
+              Meal Type
+              <select
+                value={plannerForm.mealType}
+                onChange={(e) => updatePlannerField("mealType", e.target.value)}
+              >
+                <option value="">Any meal</option>
+                <option value="Breakfast">Breakfast</option>
+                <option value="Lunch">Lunch</option>
+                <option value="Dinner">Dinner</option>
+                <option value="Snack">Snack</option>
+              </select>
+            </label>
+
+            <label>
+              Avoid Ingredients
+              <input
+                type="text"
+                placeholder="Example: peanuts, shellfish"
+                value={plannerForm.avoidIngredients}
+                onChange={(e) => updatePlannerField("avoidIngredients", e.target.value)}
+              />
+            </label>
+
+            <label>
+              Preferences
+              <input
+                type="text"
+                placeholder="Example: Indian spicy, low oil, quick meals"
+                value={plannerForm.preferences}
+                onChange={(e) => updatePlannerField("preferences", e.target.value)}
+              />
+            </label>
+
+            <label>
+              Max Prep Time (minutes)
+              <input
+                type="number"
+                min="1"
+                max="180"
+                value={plannerForm.maxPrepTime}
+                onChange={(e) => updatePlannerField("maxPrepTime", e.target.value)}
+              />
+            </label>
+
+            <button className="hg-plan-submit" disabled={plannerLoading}>
+              {plannerLoading ? "Generating Plan..." : "Get My Food & Recipe Plan"}
+            </button>
+          </form>
+
+          {plannerError && <p className="hg-plan-error">{plannerError}</p>}
+
+          {plannerResult && (
+            <div className="hg-plan-result">
+              <p className="hg-plan-summary">{plannerResult.summary}</p>
+
+              <div className="hg-plan-grid">
+                <div className="hg-plan-foods">
+                  <h3>Recommended Foods</h3>
+                  {plannerResult.recommended_foods.map((food, index) => (
+                    <div key={index} className="hg-plan-food-card">
+                      <p className="hg-plan-food-name">{food.name}</p>
+                      <p className="hg-plan-food-reason">{food.reason}</p>
+                      <p className="hg-plan-food-usage">How to use: {food.usage}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="hg-plan-avoid">
+                  <h3>Foods to Limit</h3>
+                  {plannerResult.avoid_foods.length === 0 ? (
+                    <p className="hg-plan-muted">No specific avoid list from your current input.</p>
+                  ) : (
+                    <ul>
+                      {plannerResult.avoid_foods.map((food, index) => (
+                        <li key={index}>{food}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+
+              <div className="hg-plan-recipes">
+                <h3>Recommended Recipes to Prepare</h3>
+                <div className="hg-plan-recipe-grid">
+                  {plannerResult.recipes.map((recipe) => (
+                    <div key={recipe.id} className="hg-plan-recipe-card">
+                      <img src={recipe.image} alt={recipe.title} />
+                      <div className="hg-plan-recipe-body">
+                        <p className="hg-plan-recipe-title">{recipe.title}</p>
+                        <p className="hg-plan-recipe-meta">{recipe.meal} • {recipe.time} • {recipe.diet}</p>
+                        {Array.isArray(recipe.steps) && recipe.steps.length > 0 && (
+                          <p className="hg-plan-recipe-step">First step: {recipe.steps[0]}</p>
+                        )}
+                        {recipe.id >= 0 ? (
+                          <button onClick={() => navigate(`/recipe/${recipe.id}`)}>Open Full Recipe</button>
+                        ) : (
+                          <button type="button" disabled title="Generated plan recipe">
+                            Custom Plan Recipe
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {plannerResult.lifestyle_tips.length > 0 && (
+                <div className="hg-plan-tips">
+                  <h3>Lifestyle Tips</h3>
+                  <ul>
+                    {plannerResult.lifestyle_tips.map((tip, index) => (
+                      <li key={index}>{tip}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <p className="hg-plan-disclaimer">{plannerResult.disclaimer}</p>
+            </div>
+          )}
+        </div>
 
         {/* Analyze Section */}
         <div className="hg-analyze-card">

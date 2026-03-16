@@ -8,7 +8,7 @@ const recipes = [
     calories: 320,
     difficulty: "Easy",
     meal: "Breakfast",
-    image: "https://images.unsplash.com/photo-1630383249896-483b1fbf7f9e?w=600&q=80",
+    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Rameshwaram_Cafe_Dosa.jpg/330px-Rameshwaram_Cafe_Dosa.jpg",
     pantryMatch: 85,
     ingredients: {
       available: ["Rice", "Urad Dal", "Potato", "Mustard Seeds"],
@@ -39,7 +39,7 @@ const recipes = [
     calories: 520,
     difficulty: "Medium",
     meal: "Dinner",
-    image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=600&q=80",
+    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/Shahi_panner.jpg/330px-Shahi_panner.jpg",
     pantryMatch: 72,
     ingredients: {
       available: ["Paneer", "Butter", "Tomatoes", "Onion", "Spices"],
@@ -97,7 +97,7 @@ const recipes = [
     calories: 650,
     difficulty: "Hard",
     meal: "Lunch",
-    image: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=600&q=80",
+    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/%22Hyderabadi_Dum_Biryani%22.jpg/330px-%22Hyderabadi_Dum_Biryani%22.jpg",
     pantryMatch: 75,
     ingredients: {
       available: ["Basmati Rice", "Chicken", "Onion", "Tomatoes", "Spices"],
@@ -231,6 +231,114 @@ const recipes = [
     ],
     cultural: "Buddha Bowls represent balanced, nourishing meals popularized in the global wellness food movement for their wholesome goodness.",
     similarDishes: ["Poke Bowl", "Grain Bowl", "Açaí Bowl"]
+  },
+  {
+    id: 8,
+    title: "Upma",
+    cuisine: "Indian",
+    diet: "Vegan",
+    time: "20 minutes",
+    calories: 240,
+    difficulty: "Easy",
+    meal: "Breakfast",
+    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/86/A_photo_of_Upma.jpg/330px-A_photo_of_Upma.jpg",
+    pantryMatch: 90,
+    ingredients: {
+      available: ["Semolina", "Onion", "Green Chili", "Mustard Seeds", "Curry Leaves"],
+      missing: ["Cashews"]
+    },
+    nutrition: { protein: 6, carbs: 36, fat: 7, fiber: 3 },
+    healthBenefits: ["Light meal", "Quick breakfast", "Comfort food"],
+    steps: [
+      "Dry roast semolina lightly and keep aside",
+      "Temper mustard seeds and curry leaves",
+      "Saute onion and green chili",
+      "Add hot water, then semolina slowly with stirring",
+      "Cook until fluffy and serve hot"
+    ],
+    cultural: "Upma is a classic South Indian breakfast prepared in many Indian homes.",
+    similarDishes: ["Poha", "Pongal", "Sheera"]
+  },
+  {
+    id: 9,
+    title: "Rajma Chawal",
+    cuisine: "North Indian",
+    diet: "Vegetarian",
+    time: "50 minutes",
+    calories: 460,
+    difficulty: "Medium",
+    meal: "Lunch",
+    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/37/Rajma_Masala_%2832081557778%29.jpg/330px-Rajma_Masala_%2832081557778%29.jpg",
+    pantryMatch: 84,
+    ingredients: {
+      available: ["Kidney Beans", "Rice", "Onion", "Tomato", "Spices"],
+      missing: ["Kasuri Methi"]
+    },
+    nutrition: { protein: 15, carbs: 62, fat: 10, fiber: 12 },
+    healthBenefits: ["Plant protein", "High fiber", "Iron rich"],
+    steps: [
+      "Cook soaked rajma until soft",
+      "Prepare onion tomato masala",
+      "Simmer rajma in masala",
+      "Cook rice separately",
+      "Serve hot"
+    ],
+    cultural: "Rajma chawal is a comfort lunch meal in North India.",
+    similarDishes: ["Chole Chawal", "Dal Chawal", "Lobia Curry"]
+  },
+  {
+    id: 10,
+    title: "Palak Paneer",
+    cuisine: "North Indian",
+    diet: "Vegetarian",
+    time: "40 minutes",
+    calories: 390,
+    difficulty: "Medium",
+    meal: "Dinner",
+    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Palakpaneer_Rayagada_Odisha_0009.jpg/330px-Palakpaneer_Rayagada_Odisha_0009.jpg",
+    pantryMatch: 82,
+    ingredients: {
+      available: ["Spinach", "Paneer", "Onion", "Tomato", "Spices"],
+      missing: ["Cream"]
+    },
+    nutrition: { protein: 21, carbs: 18, fat: 24, fiber: 7 },
+    healthBenefits: ["Calcium rich", "Iron rich", "High protein"],
+    steps: [
+      "Blanch spinach and make puree",
+      "Cook onion tomato masala",
+      "Add spinach puree and simmer",
+      "Add paneer cubes and cook briefly",
+      "Serve with roti"
+    ],
+    cultural: "Palak paneer is a classic Punjabi dinner curry.",
+    similarDishes: ["Saag Paneer", "Matar Paneer", "Shahi Paneer"]
+  },
+  {
+    id: 11,
+    title: "Roasted Chickpea Chaat",
+    cuisine: "Indian",
+    diet: "Vegan",
+    time: "15 minutes",
+    calories: 210,
+    difficulty: "Easy",
+    meal: "Snack",
+    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Dahi_puri%2C_Doi_phuchka.jpg/330px-Dahi_puri%2C_Doi_phuchka.jpg",
+    pantryMatch: 92,
+    ingredients: {
+      available: ["Chickpeas", "Onion", "Tomato", "Cucumber", "Lemon", "Spices"],
+      missing: []
+    },
+    nutrition: { protein: 10, carbs: 26, fat: 6, fiber: 8 },
+    healthBenefits: ["High fiber", "Protein snack", "Low calorie"],
+    steps: [
+      "Roast chickpeas with spices",
+      "Combine chopped vegetables",
+      "Mix chickpeas and vegetables",
+      "Add lemon and chaat masala",
+      "Serve fresh"
+    ],
+    cultural: "Chaat style snacks are popular across India.",
+    similarDishes: ["Bhel Puri", "Sprout Salad", "Masala Corn"]
   }
 ];
 

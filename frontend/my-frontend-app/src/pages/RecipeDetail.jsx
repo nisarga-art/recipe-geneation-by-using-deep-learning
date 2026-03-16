@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import recipes from "../data/recipes";
 import "../styles/RecipeDetail.css";
 
 const PLATFORMS = [
@@ -78,8 +77,61 @@ function BuyModal({ item, recipeName, onClose }) {
 function RecipeDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const recipe = recipes[Number(id)];
+  const [recipe, setRecipe] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [buyItem, setBuyItem] = useState(null);
+
+  useEffect(() => {
+    const fetchRecipe = async () => {
+      setLoading(true);
+      setLoadError("");
+      try {
+        const res = await fetch(`http://127.0.0.1:8000/recipes/${id}`);
+        if (!res.ok) {
+          throw new Error("Recipe not found");
+        }
+
+        const data = await res.json();
+        const ingredients = data.ingredients && typeof data.ingredients === "object"
+          ? {
+              available: Array.isArray(data.ingredients.available) ? data.ingredients.available : [],
+              missing: Array.isArray(data.ingredients.missing) ? data.ingredients.missing : [],
+            }
+          : { available: [], missing: [] };
+
+        const nutrition = data.nutrition && typeof data.nutrition === "object"
+          ? {
+              protein: Number(data.nutrition.protein || 0),
+              carbs: Number(data.nutrition.carbs || 0),
+              fat: Number(data.nutrition.fat || 0),
+              fiber: Number(data.nutrition.fiber || 0),
+            }
+          : { protein: 0, carbs: 0, fat: 0, fiber: 0 };
+
+        const steps = Array.isArray(data.steps) && data.steps.length > 0
+          ? data.steps
+          : ["Detailed steps are being updated for this recipe."];
+
+        setRecipe({
+          ...data,
+          ingredients,
+          nutrition,
+          steps,
+          healthBenefits: Array.isArray(data.health_benefits) ? data.health_benefits : [],
+          similarDishes: Array.isArray(data.similar_dishes) ? data.similar_dishes : [],
+          pantryMatch: data.pantry_match ?? 0,
+        });
+      } catch (error) {
+        setLoadError(error.message || "Unable to load recipe details");
+        setRecipe(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRecipe();
+  }, [id]);
 
   // ── Voice Assistant ──────────────────────────────────────
   // currentStep: -1 = idle, -2 = intro, 0+ = step index
@@ -96,7 +148,7 @@ function RecipeDetail() {
 
   // React-state-driven speech: fires whenever voiceActive or currentStep changes
   useEffect(() => {
-    if (!voiceActive || currentStep === -1) return;
+    if (!recipe || !voiceActive || currentStep === -1) return;
 
     // All steps finished
     if (currentStep >= recipe.steps.length) {
@@ -177,7 +229,11 @@ function RecipeDetail() {
   };
   // ────────────────────────────────────────────────────────
 
-  if (!recipe) {
+  if (loading) {
+    return <div className="rd-notfound">Loading recipe details...</div>;
+  }
+
+  if (loadError || !recipe) {
     return <div className="rd-notfound">Recipe not found.</div>;
   }
 

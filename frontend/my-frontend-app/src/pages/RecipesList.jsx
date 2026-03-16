@@ -234,7 +234,7 @@ export default function RecipesList() {
                   <span className="rl-meta-tag rl-meal">{r.meal}</span>
                   <span
                     className="rl-meta-tag rl-diet"
-                    style={{ background: DIET_COLORS[r.diet] + "22", color: DIET_COLORS[r.diet] }}
+                    style={{ background: (DIET_COLORS[r.diet] || "#6b7280") + "22", color: DIET_COLORS[r.diet] || "#6b7280" }}
                   >
                     {r.diet}
                   </span>
@@ -253,6 +253,13 @@ export default function RecipesList() {
                     {r.difficulty}
                   </span>
                 </div>
+
+                <button
+                  className="rl-open-btn"
+                  onClick={() => navigate(`/recipe/${r.id}`)}
+                >
+                  View Details
+                </button>
 
               </div>
             </div>
