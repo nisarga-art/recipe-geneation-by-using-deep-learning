@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import ProfileDropdown from "../components/ProfileDropdown";
+import allRecipes from "../data/allRecipes";
 import "../styles/RecipesList.css";
 
 const CUISINES = [
@@ -29,6 +30,57 @@ const DIET_COLORS = {
   "Non-Vegetarian": "#b71c1c",
 };
 
+const DEFAULT_IMAGE = "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80&auto=format&fit=crop";
+
+const normalizeRecipe = (item) => ({
+  id: item.id,
+  title: item.title || "Untitled Recipe",
+  cuisine: item.cuisine || "Fusion",
+  diet: item.diet || "Unknown",
+  time: item.time || "30 minutes",
+  calories: typeof item.calories === "number" ? item.calories : item.calories || "Unknown",
+  difficulty: item.difficulty || "Unknown",
+  meal: item.meal || "Main Course",
+  image: item.image || DEFAULT_IMAGE,
+  pantry_match: item.pantry_match ?? null,
+  steps: Array.isArray(item.steps) && item.steps.length
+    ? item.steps
+    : [
+        "Prep ingredients: chop aromatics, measure spices, ready protein/veg.",
+        "Cook base: heat oil, sauté aromatics, toast spices until fragrant.",
+        "Build: add mains, simmer/roast until tender and flavors marry.",
+        "Finish: adjust seasoning, garnish, and serve warm.",
+      ],
+  ingredients: item.ingredients && typeof item.ingredients === "object"
+    ? item.ingredients
+    : { available: ["Main produce", "Protein or legumes", "Spice blend", "Oil"], missing: [] },
+  nutrition: item.nutrition && typeof item.nutrition === "object"
+    ? item.nutrition
+    : { protein: 12, carbs: 36, fat: 14, fiber: 5 },
+  health_benefits: Array.isArray(item.health_benefits) ? item.health_benefits : [],
+  similar_dishes: Array.isArray(item.similar_dishes) ? item.similar_dishes : [],
+});
+
+const applyFilters = (list, searchText, cuisine, diet) => {
+  const term = searchText.trim().toLowerCase();
+  const cuisineKey = cuisine.toLowerCase();
+  const dietKey = diet.toLowerCase();
+
+  return list
+    .filter((item) => {
+      const title = (item.title || "").toLowerCase();
+      const itemCuisine = (item.cuisine || "").toLowerCase();
+      const itemDiet = (item.diet || "Unknown").toLowerCase();
+
+      const matchesSearch = term ? title.includes(term) || itemCuisine.includes(term) : true;
+      const matchesCuisine = cuisine === "All" ? true : itemCuisine.includes(cuisineKey);
+      const matchesDiet = diet === "All" ? true : itemDiet.includes(dietKey);
+
+      return matchesSearch && matchesCuisine && matchesDiet;
+    })
+    .map(normalizeRecipe);
+};
+
 export default function RecipesList() {
   const navigate = useNavigate();
   const [recipes, setRecipes] = useState([]);
@@ -45,21 +97,33 @@ export default function RecipesList() {
 
   useEffect(() => {
     const params = new URLSearchParams();
-    if (search) params.append("search", search);
     if (activeCuisine !== "All") params.append("cuisine", activeCuisine);
     if (activeDiet !== "All") params.append("diet", activeDiet);
 
-    setLoading(true);
-    fetch(`http://127.0.0.1:8000/recipes?${params.toString()}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setRecipes(data);
-        setLoading(false);
-      })
-      .catch((err) => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const url = search
+          ? `http://127.0.0.1:8000/recipes/search?query=${encodeURIComponent(search)}&${params.toString()}`
+          : `http://127.0.0.1:8000/recipes?${params.toString()}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const apiList = Array.isArray(data) ? data : [];
+
+        const filteredApi = applyFilters(apiList, search, activeCuisine, activeDiet);
+        const filteredFallback = applyFilters(allRecipes, search, activeCuisine, activeDiet);
+
+        // Prefer live data; if none, fall back to curated local recipes so the grid is never empty.
+        setRecipes(filteredApi.length ? filteredApi : filteredFallback);
+      } catch (err) {
         console.error("Failed to fetch recipes:", err);
+        setRecipes(applyFilters(allRecipes, search, activeCuisine, activeDiet));
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+
+    fetchData();
   }, [search, activeCuisine, activeDiet]);
 
   useEffect(() => {
@@ -80,7 +144,6 @@ export default function RecipesList() {
     });
   };
 
-  // Backend handles all filtering, recipes are already filtered
   const filtered = recipes;
 
   return (
@@ -256,7 +319,7 @@ export default function RecipesList() {
 
                 <button
                   className="rl-open-btn"
-                  onClick={() => navigate(`/recipe/${r.id}`)}
+                  onClick={() => navigate(`/recipe/${r.id}`, { state: { recipe: r } })}
                 >
                   View Details
                 </button>

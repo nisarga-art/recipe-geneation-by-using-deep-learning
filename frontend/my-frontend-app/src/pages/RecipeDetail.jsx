@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import "../styles/RecipeDetail.css";
 
 const PLATFORMS = [
@@ -77,12 +77,56 @@ function BuyModal({ item, recipeName, onClose }) {
 function RecipeDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [recipe, setRecipe] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [buyItem, setBuyItem] = useState(null);
 
   useEffect(() => {
+    const stateRecipe = location.state && location.state.recipe ? location.state.recipe : null;
+
+    const toRecipeView = (data) => {
+      const ingredients = data.ingredients && typeof data.ingredients === "object"
+        ? {
+            available: Array.isArray(data.ingredients.available) ? data.ingredients.available : [],
+            missing: Array.isArray(data.ingredients.missing) ? data.ingredients.missing : [],
+          }
+        : { available: [], missing: [] };
+
+      const nutrition = data.nutrition && typeof data.nutrition === "object"
+        ? {
+            protein: Number(data.nutrition.protein || 0),
+            carbs: Number(data.nutrition.carbs || 0),
+            fat: Number(data.nutrition.fat || 0),
+            fiber: Number(data.nutrition.fiber || 0),
+          }
+        : { protein: 0, carbs: 0, fat: 0, fiber: 0 };
+
+      const steps = Array.isArray(data.steps) && data.steps.length > 0
+        ? data.steps
+        : ["Detailed steps are being updated for this recipe."];
+
+      const fallbackImage = "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200&q=80&auto=format&fit=crop";
+
+      setRecipe({
+        ...data,
+        image: data.image || fallbackImage,
+        ingredients,
+        nutrition,
+        steps,
+        healthBenefits: Array.isArray(data.health_benefits) ? data.health_benefits : [],
+        similarDishes: Array.isArray(data.similar_dishes) ? data.similar_dishes : [],
+        pantryMatch: data.pantry_match ?? 0,
+      });
+    };
+
+    if (stateRecipe) {
+      toRecipeView(stateRecipe);
+      setLoading(false);
+      return;
+    }
+
     const fetchRecipe = async () => {
       setLoading(true);
       setLoadError("");
@@ -93,35 +137,7 @@ function RecipeDetail() {
         }
 
         const data = await res.json();
-        const ingredients = data.ingredients && typeof data.ingredients === "object"
-          ? {
-              available: Array.isArray(data.ingredients.available) ? data.ingredients.available : [],
-              missing: Array.isArray(data.ingredients.missing) ? data.ingredients.missing : [],
-            }
-          : { available: [], missing: [] };
-
-        const nutrition = data.nutrition && typeof data.nutrition === "object"
-          ? {
-              protein: Number(data.nutrition.protein || 0),
-              carbs: Number(data.nutrition.carbs || 0),
-              fat: Number(data.nutrition.fat || 0),
-              fiber: Number(data.nutrition.fiber || 0),
-            }
-          : { protein: 0, carbs: 0, fat: 0, fiber: 0 };
-
-        const steps = Array.isArray(data.steps) && data.steps.length > 0
-          ? data.steps
-          : ["Detailed steps are being updated for this recipe."];
-
-        setRecipe({
-          ...data,
-          ingredients,
-          nutrition,
-          steps,
-          healthBenefits: Array.isArray(data.health_benefits) ? data.health_benefits : [],
-          similarDishes: Array.isArray(data.similar_dishes) ? data.similar_dishes : [],
-          pantryMatch: data.pantry_match ?? 0,
-        });
+        toRecipeView(data);
       } catch (error) {
         setLoadError(error.message || "Unable to load recipe details");
         setRecipe(null);
@@ -131,7 +147,7 @@ function RecipeDetail() {
     };
 
     fetchRecipe();
-  }, [id]);
+  }, [id, location.state]);
 
   // ── Voice Assistant ──────────────────────────────────────
   // currentStep: -1 = idle, -2 = intro, 0+ = step index

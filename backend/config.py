@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     CLARIFAI_APP_ID: str = "main"
     CLARIFAI_MODEL_ID: str = "food-item-recognition"
     CLARIFAI_MODEL_VERSION: str = "1d5fd481e0cf4826aa72ec3ff049e044"
+    # Clarifai text search (set if you want text queries). Leave blank to disable.
+    CLARIFAI_TEXT_MODEL_ID: str = ""
+    CLARIFAI_TEXT_MODEL_VERSION: str = ""
 
     # JWT Auth
     SECRET_KEY: str = "change-this-to-a-random-secret"
