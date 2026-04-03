@@ -131,7 +131,8 @@ function RecipeDetail() {
       setLoading(true);
       setLoadError("");
       try {
-        const res = await fetch(`http://127.0.0.1:8000/recipes/${id}`);
+        const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+        const res = await fetch(`${API_BASE.replace(/\/$/, "")}/recipes/${id}`);
         if (!res.ok) {
           throw new Error("Recipe not found");
         }

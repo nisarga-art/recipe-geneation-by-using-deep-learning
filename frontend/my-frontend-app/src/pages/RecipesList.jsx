@@ -103,9 +103,10 @@ export default function RecipesList() {
     const fetchData = async () => {
       setLoading(true);
       try {
+        const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
         const url = search
-          ? `http://127.0.0.1:8000/recipes/search?query=${encodeURIComponent(search)}&${params.toString()}`
-          : `http://127.0.0.1:8000/recipes?${params.toString()}`;
+          ? `${API_BASE.replace(/\/$/, "")}/recipes/search?query=${encodeURIComponent(search)}&${params.toString()}`
+          : `${API_BASE.replace(/\/$/, "")}/recipes?${params.toString()}`;
         const res = await fetch(url);
         const data = await res.json();
         const apiList = Array.isArray(data) ? data : [];

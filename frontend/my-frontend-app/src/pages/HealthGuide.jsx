@@ -132,38 +132,65 @@ function HealthGuide() {
     e.preventDefault();
     setPlannerLoading(true);
     setPlannerError("");
+    setPlannerResult(null);
 
+    // Use Vite env var if provided, otherwise default to localhost:8000
+    const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+    const url = `${API_BASE.replace(/\/$/, "")}/health-plan/recommendations`;
+
+    // Backend expects HealthPlanRequest schema (snake_case): arrays for health_issues and avoid_ingredients
     const payload = {
-      health_issues: plannerForm.healthIssues
+      health_issues: (plannerForm.healthIssues || "")
         .split(",")
-        .map((item) => item.trim())
+        .map((s) => s.trim())
         .filter(Boolean),
       diet_goal: plannerForm.dietGoal || null,
       meal_type: plannerForm.mealType || null,
       preferences: plannerForm.preferences || null,
-      avoid_ingredients: plannerForm.avoidIngredients
+      avoid_ingredients: (plannerForm.avoidIngredients || "")
         .split(",")
-        .map((item) => item.trim())
+        .map((s) => s.trim())
         .filter(Boolean),
       max_prep_time: plannerForm.maxPrepTime ? Number(plannerForm.maxPrepTime) : null,
     };
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
     try {
-      const response = await fetch("http://127.0.0.1:8000/health-plan/recommendations", {
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
+        signal: controller.signal,
       });
 
-      if (!response.ok) {
-        throw new Error("Could not generate recommendations right now.");
+      clearTimeout(timeout);
+
+      // Network-level OK but server may return non-2xx JSON error
+      const text = await res.text();
+      let data = null;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch (err) {
+        throw new Error("Invalid JSON response from server.");
       }
 
-      const data = await response.json();
+      if (!res.ok) {
+        const message = (data && (data.detail || data.error || data.message)) || `Server responded with ${res.status}`;
+        throw new Error(message);
+      }
+
+      // Expect `data` to contain a `recipes` array for rendering
       setPlannerResult(data);
-    } catch (error) {
-      setPlannerError(error.message || "Failed to load recommendations.");
+    } catch (err) {
+      if (err.name === "AbortError") {
+        setPlannerError("Request timed out. Please try again.");
+      } else {
+        setPlannerError(err.message || "Failed to fetch recipes.");
+      }
     } finally {
+      clearTimeout(timeout);
       setPlannerLoading(false);
     }
   };
