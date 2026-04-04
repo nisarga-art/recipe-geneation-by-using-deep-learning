@@ -1,6 +1,8 @@
 import React, { useRef, useState } from "react";
 import "../App.css";
 import { useNavigate, Link } from "react-router-dom";
+import GoogleSignInButton from "../components/GoogleSignInButton";
+import FacebookSignInButton from "../components/FacebookSignInButton";
 
 const PARTICLES = [
   { emoji: "🍕", top: "8%",  left: "5%",  delay: "0s",   dur: "7s",  size: "2.2rem" },
@@ -322,15 +324,35 @@ function Login() {
 
         <div className="login-social-row">
 
-          <button className="login-social google" type="button" onClick={() => setSocialModal("google")}>
-            <GoogleLogoSVG />
-            Google
-          </button>
+          <GoogleSignInButton
+            onSuccess={(profile) => {
+              localStorage.setItem('user_email', profile.email || '');
+              localStorage.setItem('user_name', profile.name || '');
+              if (profile.picture) localStorage.setItem('user_picture', profile.picture);
+              setSocialModal(null);
+              setLoginError('');
+              navigate('/home');
+            }}
+            onError={(err) => {
+              const msg = (err && err.error_description) || (err && err.error) || (err && err.message) || 'Google sign in failed or cancelled';
+              setLoginError(String(msg));
+            }}
+          />
 
-          <button className="login-social facebook" type="button" onClick={() => setSocialModal("facebook")}>
-            <FacebookLogoSVG />
-            Facebook
-          </button>
+          <FacebookSignInButton
+            onSuccess={(profile) => {
+              localStorage.setItem('user_email', profile.email || '');
+              localStorage.setItem('user_name', profile.name || '');
+              if (profile.picture) localStorage.setItem('user_picture', profile.picture);
+              setSocialModal(null);
+              setLoginError('');
+              navigate('/home');
+            }}
+            onError={(err) => {
+              const msg = (err && err.error && err.error.message) || (err && err.message) || 'Facebook sign in failed or cancelled';
+              setLoginError(String(msg));
+            }}
+          />
 
         </div>
 
