@@ -1,5 +1,5 @@
-import React, { useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useRef, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import "../styles/HealthGuide.css";
 import ProfileDropdown from "../components/ProfileDropdown";
 
@@ -77,7 +77,13 @@ const NAVBAR_SVG = {
 
 function HealthGuide() {
   const navigate = useNavigate();
+  const location = useLocation();
   const fileInputRef = useRef(null);
+  const plannerRef = useRef(null);
+  const [topicBanner, setTopicBanner] = useState(null);
+
+  const nutRefs = useRef({});
+  const [focusedSlug, setFocusedSlug] = useState(null);
 
   const [preview, setPreview]       = useState(null);
   const [analyzing, setAnalyzing]   = useState(false);
@@ -115,6 +121,42 @@ function HealthGuide() {
       setResult(analyzeImage());
     }, 2000);
   };
+
+  useEffect(() => {
+    // read URL params: focus (slug) or search
+    const params = new URLSearchParams(location.search);
+    const focus = params.get("focus");
+    const q = params.get("search") || params.get("q");
+    if (q) {
+      try { setSearch(decodeURIComponent(q)); } catch(e) { setSearch(q); }
+    }
+    if (focus) {
+      setFocusedSlug(focus);
+      // small delay to ensure refs are set
+      setTimeout(() => {
+        const el = nutRefs.current[focus];
+        if (el && typeof el.scrollIntoView === 'function') {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // temporarily add highlight class
+          el.classList.add('hg-highlight');
+          setTimeout(() => el.classList.remove('hg-highlight'), 3000);
+        }
+      }, 120);
+    }
+
+    // topic-based handling (e.g., low-calorie -> preselect weight loss in planner)
+    const topic = params.get("topic");
+    if (topic === "low-calorie") {
+      setTopicBanner("Low-calorie tips: preselected Weight Loss guidance");
+      setPlannerForm((p) => ({ ...p, dietGoal: "weight loss" }));
+      setTimeout(() => {
+        if (plannerRef.current && typeof plannerRef.current.scrollIntoView === 'function') {
+          plannerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 140);
+      setTimeout(() => setTopicBanner(null), 5000);
+    }
+  }, [location.search]);
 
   const onFileChange = (e) => handleFile(e.target.files[0]);
 
@@ -311,6 +353,14 @@ function HealthGuide() {
 
           {plannerError && <p className="hg-plan-error">{plannerError}</p>}
 
+          {topicBanner && (
+            <div style={{background:'#fff7ed',border:'1px solid #ffe3c7',padding:12,borderRadius:10,marginTop:12}}>
+              <strong>{topicBanner}</strong>
+            </div>
+          )}
+
+          <div ref={plannerRef} />
+
           {plannerResult && (
             <div className="hg-plan-result">
               <p className="hg-plan-summary">{plannerResult.summary}</p>
@@ -475,7 +525,11 @@ function HealthGuide() {
               <button style={{background:"#ff6a00",color:"#fff",border:"none",borderRadius:"8px",padding:"8px 20px",fontWeight:600,cursor:"pointer"}} onClick={() => setSearch("")}>Clear</button>
             </div>
           ) : visibleNutrients.map((n, i) => (
-            <div className="hg-nutrient-card" key={i}>
+            <div
+              ref={(el) => { if (el) nutRefs.current[n.slug] = el; }}
+              className={`hg-nutrient-card ${focusedSlug === n.slug ? 'hg-highlight' : ''}`}
+              key={i}
+            >
               <span className="hg-nutrient-emoji" style={{ background: n.color + "18" }}>
                 {n.emoji}
               </span>

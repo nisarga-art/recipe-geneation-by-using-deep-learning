@@ -592,6 +592,13 @@
   box-shadow: 0 6px 20px rgba(0,0,0,0.09);
 }
 
+/* highlight when navigated from elsewhere */
+.hg-highlight {
+  border: 2px solid #ff6a00 !important;
+  box-shadow: 0 12px 40px rgba(255,106,0,0.12) !important;
+  transform: translateY(-6px) !important;
+}
+
 .hg-nutrient-emoji {
   width: 48px;
   height: 48px;

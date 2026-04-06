@@ -274,19 +274,27 @@ export default function RecipesList() {
 
       {/* ── Recipe Grid ─────────────────────────────────────── */}
       <div className="rl-grid">
-        {loading ? (
+          {loading ? (
           <div className="rl-empty" style={{textAlign:"center",padding:"2rem"}}>🔍 Searching recipes...</div>
         ) : filtered.length === 0 ? (
           <div className="rl-empty">No recipes match your filters. Try a different search.</div>
         ) : (
           filtered.map((r) => (
-            <div className="rl-card" key={r.id}>
+            <div
+              className="rl-card"
+              key={r.id}
+              onClick={(e) => { console.log('card click', r.id); navigate(`/recipe/${r.id}`, { state: { recipe: r } }); }}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter') { console.log('card key enter', r.id); navigate(`/recipe/${r.id}`, { state: { recipe: r } }); } }}
+              style={{ cursor: 'pointer' }}
+            >
               <div className="rl-card-img-wrap">
                 <img src={r.image} alt={r.title} className="rl-card-img" />
                 <span className="rl-cuisine-badge">{r.cuisine}</span>
                 <button
                   className={`rl-fav-btn${favorites.includes(r.id) ? " active" : ""}`}
-                  onClick={() => toggleFav(r.id)}
+                  onClick={(e) => { e.stopPropagation(); toggleFav(r.id); }}
                   title={favorites.includes(r.id) ? "Remove from favorites" : "Add to favorites"}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill={favorites.includes(r.id) ? "#e53e3e" : "none"} stroke={favorites.includes(r.id) ? "#e53e3e" : "#fff"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
@@ -320,7 +328,7 @@ export default function RecipesList() {
 
                 <button
                   className="rl-open-btn"
-                  onClick={() => navigate(`/recipe/${r.id}`, { state: { recipe: r } })}
+                  onClick={(e) => { e.stopPropagation(); console.log('view details click', r.id); navigate(`/recipe/${r.id}`, { state: { recipe: r } }); }}
                 >
                   View Details
                 </button>

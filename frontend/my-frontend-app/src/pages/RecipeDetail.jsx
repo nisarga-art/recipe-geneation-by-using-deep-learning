@@ -1,6 +1,52 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
+import allRecipes from "../data/allRecipes";
+import recipesData from "../data/recipes";
 import "../styles/RecipeDetail.css";
+
+// Estimate macros from calories if detailed nutrition is missing.
+function estimateNutritionFromCalories(calories) {
+  // reasonable default split: 20% protein, 55% carbs, 25% fat
+  const proteinCals = calories * 0.20;
+  const carbsCals = calories * 0.55;
+  const fatCals = calories * 0.25;
+  return {
+    protein: proteinCals / 4,
+    carbs: carbsCals / 4,
+    fat: fatCals / 9,
+    fiber: Math.max(0, Math.round((calories / 100) * 1.5)),
+  };
+}
+
+const SUBSTITUTES = {
+  Cream: ["Yogurt", "Coconut cream", "Milk + Butter"],
+  "Kasuri Methi": ["Fenugreek leaves", "Dried fenugreek"],
+  Saffron: ["Turmeric (color only)", "Annatto"],
+  "Curry Leaves": ["Lime zest", "Bay leaf (different flavor)"] ,
+  "Sesame Oil": ["Vegetable oil + sesame seeds", "Peanut oil"],
+  "Heavy Cream": ["Greek yogurt", "Coconut cream", "Milk + butter"],
+};
+
+function findSubstitutes(item) {
+  if (!item) return [];
+  const key = Object.keys(SUBSTITUTES).find(k => k.toLowerCase() === item.toLowerCase());
+  return key ? SUBSTITUTES[key] : [];
+}
+
+function mapHealthTagToSlug(tag) {
+  if (!tag) return null;
+  const t = tag.toLowerCase();
+  if (t.includes('protein')) return 'protein';
+  if (t.includes('fiber')) return 'dietary-fiber';
+  if (t.includes('vitamin c') || t.includes('vit c')) return 'vitamin-c';
+  if (t.includes('vitamin d') || t.includes('vit d')) return 'vitamin-d';
+  if (t.includes('omega')) return 'omega-3';
+  if (t.includes('iron')) return 'iron';
+  if (t.includes('calcium')) return 'calcium';
+  if (t.includes('carb') || t.includes('carbo')) return 'carbohydrates';
+  // fallback: no direct slug known
+  return null;
+}
 
 const PLATFORMS = [
   {
@@ -82,44 +128,58 @@ function RecipeDetail() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [buyItem, setBuyItem] = useState(null);
+  const [localRecipe, setLocalRecipe] = useState(null);
+
+  const toRecipeView = (data) => {
+    const ingredients = data.ingredients && typeof data.ingredients === "object"
+      ? {
+          available: Array.isArray(data.ingredients.available) ? data.ingredients.available : [],
+          missing: Array.isArray(data.ingredients.missing) ? data.ingredients.missing : [],
+        }
+      : { available: [], missing: [] };
+
+    const nutrition = data.nutrition && typeof data.nutrition === "object"
+      ? {
+          protein: Number(data.nutrition.protein || 0),
+          carbs: Number(data.nutrition.carbs || 0),
+          fat: Number(data.nutrition.fat || 0),
+          fiber: Number(data.nutrition.fiber || 0),
+        }
+      : { protein: 0, carbs: 0, fat: 0, fiber: 0 };
+
+    // Estimate nutrition if missing but calories present
+    if ((!nutrition.protein && !nutrition.carbs && !nutrition.fat) && data.calories) {
+      const est = estimateNutritionFromCalories(Number(data.calories));
+      nutrition.protein = Math.round(est.protein);
+      nutrition.carbs = Math.round(est.carbs);
+      nutrition.fat = Math.round(est.fat);
+      nutrition.fiber = Math.round(est.fiber || 0);
+    }
+
+    const steps = Array.isArray(data.steps) && data.steps.length > 0
+      ? data.steps
+      : ["Detailed steps are being updated for this recipe."];
+
+    const fallbackImage = "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200&q=80&auto=format&fit=crop";
+
+    setRecipe({
+      ...data,
+      image: data.image || fallbackImage,
+      ingredients,
+      nutrition,
+      steps,
+      healthBenefits: Array.isArray(data.health_benefits) ? data.health_benefits : [],
+      similarDishes: Array.isArray(data.similar_dishes) ? data.similar_dishes : [],
+      pantryMatch: data.pantry_match ?? 0,
+    });
+    setLocalRecipe({
+      ...data,
+      ingredients,
+    });
+  };
 
   useEffect(() => {
     const stateRecipe = location.state && location.state.recipe ? location.state.recipe : null;
-
-    const toRecipeView = (data) => {
-      const ingredients = data.ingredients && typeof data.ingredients === "object"
-        ? {
-            available: Array.isArray(data.ingredients.available) ? data.ingredients.available : [],
-            missing: Array.isArray(data.ingredients.missing) ? data.ingredients.missing : [],
-          }
-        : { available: [], missing: [] };
-
-      const nutrition = data.nutrition && typeof data.nutrition === "object"
-        ? {
-            protein: Number(data.nutrition.protein || 0),
-            carbs: Number(data.nutrition.carbs || 0),
-            fat: Number(data.nutrition.fat || 0),
-            fiber: Number(data.nutrition.fiber || 0),
-          }
-        : { protein: 0, carbs: 0, fat: 0, fiber: 0 };
-
-      const steps = Array.isArray(data.steps) && data.steps.length > 0
-        ? data.steps
-        : ["Detailed steps are being updated for this recipe."];
-
-      const fallbackImage = "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200&q=80&auto=format&fit=crop";
-
-      setRecipe({
-        ...data,
-        image: data.image || fallbackImage,
-        ingredients,
-        nutrition,
-        steps,
-        healthBenefits: Array.isArray(data.health_benefits) ? data.health_benefits : [],
-        similarDishes: Array.isArray(data.similar_dishes) ? data.similar_dishes : [],
-        pantryMatch: data.pantry_match ?? 0,
-      });
-    };
 
     if (stateRecipe) {
       toRecipeView(stateRecipe);
@@ -140,8 +200,21 @@ function RecipeDetail() {
         const data = await res.json();
         toRecipeView(data);
       } catch (error) {
-        setLoadError(error.message || "Unable to load recipe details");
-        setRecipe(null);
+        // Try local fallback from curated dataset
+        try {
+          // prefer richer `recipesData` dataset, then fall back to `allRecipes`
+          const fallback = (recipesData || []).find((r) => String(r.id) === String(id)) || allRecipes.find((r) => String(r.id) === String(id));
+          if (fallback) {
+            toRecipeView(fallback);
+            setLoadError("");
+          } else {
+            setLoadError(error.message || "Unable to load recipe details");
+            setRecipe(null);
+          }
+        } catch (e) {
+          setLoadError(error.message || "Unable to load recipe details");
+          setRecipe(null);
+        }
       } finally {
         setLoading(false);
       }
@@ -227,6 +300,19 @@ function RecipeDetail() {
     setVoicePaused(true);
   };
 
+  const useSubstitute = (missingItem, substitute) => {
+    if (!localRecipe) return;
+    const iAvailable = Array.from(localRecipe.ingredients.available || []);
+    const iMissing = Array.from(localRecipe.ingredients.missing || []).filter(m => m !== missingItem);
+    iAvailable.push(substitute);
+    const updated = {
+      ...localRecipe,
+      ingredients: { available: iAvailable, missing: iMissing },
+    };
+    setLocalRecipe(updated);
+    setRecipe(prev => ({ ...prev, ingredients: updated.ingredients }));
+  };
+
   const resumeVoice = () => {
     window.speechSynthesis.resume();
     setVoicePaused(false);
@@ -236,7 +322,8 @@ function RecipeDetail() {
     window.speechSynthesis.cancel();
     setCurrentStep(prev => {
       const next = prev === -2 ? 0 : prev + 1;
-      return next >= recipe.steps.length ? recipe.steps.length : next;
+      const currentSteps = (localRecipe || recipe).steps || [];
+      return next >= currentSteps.length ? currentSteps.length : next;
     });
   };
 
@@ -254,6 +341,8 @@ function RecipeDetail() {
     return <div className="rd-notfound">Recipe not found.</div>;
   }
 
+  const current = localRecipe || recipe;
+
   const difficultyColor = {
     Easy: "#22c55e",
     Medium: "#f97316",
@@ -267,19 +356,35 @@ function RecipeDetail() {
   };
 
   const nutritionItems = [
-    { emoji: "🔥", label: "Calories", value: `${recipe.calories} kcal` },
-    { emoji: "💪", label: "Protein",  value: `${recipe.nutrition.protein}g` },
-    { emoji: "🌾", label: "Carbohydrates", value: `${recipe.nutrition.carbs}g` },
-    { emoji: "🥑", label: "Fat", value: `${recipe.nutrition.fat}g` },
-    { emoji: "🌿", label: "Fiber", value: `${recipe.nutrition.fiber}g` }
+    { emoji: "🔥", label: "Calories", value: `${current.calories} kcal` },
+    { emoji: "💪", label: "Protein",  value: `${current.nutrition.protein}g` },
+    { emoji: "🌾", label: "Carbohydrates", value: `${current.nutrition.carbs}g` },
+    { emoji: "🥑", label: "Fat", value: `${current.nutrition.fat}g` },
+    { emoji: "🌿", label: "Fiber", value: `${current.nutrition.fiber}g` }
   ];
+
+  const getHealthyAlternatives = (cur) => {
+    if (!cur) return [];
+    const candidates = (recipesData || []).filter(r => String(r.id) !== String(cur.id));
+    const better = candidates.filter(r => {
+      // prefer same meal or same cuisine, and lower calories
+      const similarMeal = r.meal === cur.meal;
+      const similarCuisine = r.cuisine === cur.cuisine;
+      const lowerCal = (r.calories || 0) <= (cur.calories || 9999);
+      const isHealthier = (r.diet === "Vegan" || r.diet === "Vegetarian") || (r.calories || 0) < (cur.calories || 0);
+      return (similarMeal || similarCuisine) && lowerCal && isHealthier;
+    });
+    return better.slice(0,4);
+  };
+
+  const healthyAlternatives = getHealthyAlternatives(current);
 
   return (
     <div className="rd-page">
       {buyItem && (
         <BuyModal
           item={buyItem}
-          recipeName={recipe.title}
+          recipeName={current ? current.title : recipe.title}
           onClose={() => setBuyItem(null)}
         />
       )}
@@ -292,17 +397,21 @@ function RecipeDetail() {
 
         <div className="rd-hero">
           <div className="rd-tags">
-            <span className="rd-tag rd-tag-grey">{recipe.cuisine}</span>
-            <span className="rd-tag" style={{ background: difficultyColor[recipe.difficulty] }}>{recipe.difficulty}</span>
-            <span className="rd-tag" style={{ background: dietColor[recipe.diet] || "#22c55e" }}>{recipe.diet}</span>
+            <span className="rd-tag rd-tag-grey">{current.cuisine}</span>
+            <span className="rd-tag" style={{ background: difficultyColor[current.difficulty] }}>{current.difficulty}</span>
+            <span className="rd-tag" style={{ background: dietColor[current.diet] || "#22c55e" }}>{current.diet}</span>
           </div>
 
-          <h1 className="rd-title">{recipe.title}</h1>
+          <h1 className="rd-title">{current.title}</h1>
 
           <div className="rd-meta">
-            <span>⏱ {recipe.time}</span>
-            <span>🔥 {recipe.calories} kcal</span>
-            <span>🍽 {recipe.meal}</span>
+            <span>⏱ {current.time}</span>
+            <span
+              title={current.calories <= 350 ? "Low calorie — click to learn more" : undefined}
+              style={current.calories <= 350 ? { cursor: "pointer", textDecoration: "underline" } : {}}
+              onClick={() => { if (current.calories <= 350) navigate(`/health-guide?topic=low-calorie`); }}
+            >🔥 {current.calories} kcal</span>
+            <span>🍽 {current.meal}</span>
           </div>
         </div>
       </div>
@@ -321,7 +430,7 @@ function RecipeDetail() {
               <div className="rd-ingredients-col">
                 <p className="rd-ing-heading rd-ing-green">✅ Available in Pantry</p>
                 <ul className="rd-ing-list">
-                  {recipe.ingredients.available.map((item, i) => (
+                  {current.ingredients.available.map((item, i) => (
                     <li key={i}><span className="rd-dot rd-dot-green" />{item}</li>
                   ))}
                 </ul>
@@ -330,13 +439,27 @@ function RecipeDetail() {
               <div className="rd-ingredients-col">
                 <p className="rd-ing-heading rd-ing-red">⊗ Missing Items</p>
                 <ul className="rd-ing-list">
-                  {recipe.ingredients.missing.map((item, i) => (
+                  {current.ingredients.missing.map((item, i) => (
                     <li key={i} className="rd-missing-item">
                       <span className="rd-dot rd-dot-red" />{item}
                       <button
                         className="rd-buy-btn"
                         onClick={() => setBuyItem(item)}
                       >🛒 Buy</button>
+
+                      {/* Substitutes */}
+                      {(() => {
+                        const subs = findSubstitutes(item);
+                        if (!subs || subs.length === 0) return null;
+                        return (
+                          <div className="rd-substitute-list">
+                            <small>Try substitutes:</small>
+                            {subs.map((s, idx) => (
+                              <button key={idx} className="rd-sub-btn" onClick={() => useSubstitute(item, s)}>{s}</button>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </li>
                   ))}
                 </ul>
@@ -370,7 +493,7 @@ function RecipeDetail() {
                     ))}
                   </span>
                   <span className="rd-voice-status">
-                    {voicePaused ? "Paused" : currentStep >= 0 ? `Speaking Step ${currentStep + 1} of ${recipe.steps.length}` : "Preparing..."}
+                    {voicePaused ? "Paused" : currentStep >= 0 ? `Speaking Step ${currentStep + 1} of ${current.steps.length}` : "Preparing..."}
                   </span>
                 </div>
                 <div className="rd-voice-controls">
@@ -385,7 +508,7 @@ function RecipeDetail() {
             )}
 
             <ol className="rd-steps">
-              {recipe.steps.map((step, i) => (
+              {current.steps.map((step, i) => (
                 <li key={i} className={currentStep === i ? "rd-step-active" : ""}>
                   <span className="rd-step-num">{i + 1}</span>
                   <span className="rd-step-text">{step}</span>
@@ -400,7 +523,7 @@ function RecipeDetail() {
           {/* Cultural Insight */}
           <div className="rd-card rd-cultural">
             <h2 className="rd-section-title">💡 Cultural Insight</h2>
-            <p className="rd-cultural-text">{recipe.cultural}</p>
+            <p className="rd-cultural-text">{current.cultural}</p>
           </div>
 
         </div>
@@ -426,26 +549,58 @@ function RecipeDetail() {
           <div className="rd-card">
             <h2 className="rd-section-title">Health Benefits</h2>
             <div className="rd-benefit-tags">
-              {recipe.healthBenefits.map((b, i) => (
-                <span key={i} className="rd-benefit-tag">{b}</span>
+              {current.healthBenefits.map((b, i) => (
+                <button key={i} className="rd-benefit-tag" onClick={() => {
+                  const slug = mapHealthTagToSlug(b);
+                  if (slug) navigate(`/health-guide?focus=${slug}`);
+                  else navigate(`/health-guide?search=${encodeURIComponent(b)}`);
+                }}>{b}</button>
               ))}
             </div>
+            {current.calories <= 350 && (
+              <div style={{ marginTop: 12 }}>
+                <button className="rd-view-alt" onClick={() => navigate(`/health-guide?topic=low-calorie`)}>Low-calorie tips</button>
+              </div>
+            )}
           </div>
 
           {/* Similar Dishes */}
           <div className="rd-card">
             <h2 className="rd-section-title">Similar Dishes</h2>
             <ul className="rd-similar-list">
-              {recipe.similarDishes.map((d, i) => (
+              {current.similarDishes.map((d, i) => (
                 <li key={i} className="rd-similar-item">{d}</li>
               ))}
             </ul>
           </div>
 
+          {/* Healthy Alternatives */}
+          <div className="rd-card">
+            <h2 className="rd-section-title">Healthy Alternatives</h2>
+            {healthyAlternatives.length === 0 ? (
+              <p className="rd-empty-small">No healthier alternatives found nearby.</p>
+            ) : (
+              <ul className="rd-healthy-list">
+                {healthyAlternatives.map((h) => (
+                  <li key={h.id} className="rd-healthy-item">
+                    <img src={h.image} alt={h.title} className="rd-healthy-thumb"/>
+                    <div className="rd-healthy-info">
+                      <strong>{h.title}</strong>
+                      <small>{h.cuisine} • {h.time} • {h.calories} kcal</small>
+                    </div>
+                    <div>
+                      <button className="rd-view-alt" onClick={() => navigate(`/recipe/${h.id}`, { state: { recipe: h } })}>View</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           {/* Pantry Match */}
           <div className="rd-pantry-card">
             <p className="rd-pantry-label">Pantry Match</p>
-            <p className="rd-pantry-percent">{recipe.pantryMatch}%</p>
+            <p className="rd-pantry-percent">{current.pantryMatch}%</p>
             <p className="rd-pantry-sub">You have most ingredients for this recipe!</p>
           </div>
 

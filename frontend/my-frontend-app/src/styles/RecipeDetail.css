@@ -616,3 +616,18 @@
   opacity: 0.85;
   margin: 0;
 }
+
+/* Substitutes */
+.rd-substitute-list { display:flex; flex-wrap:wrap; gap:8px; margin-left:12px; align-items:center }
+.rd-substitute-list small { color:#777; margin-right:6px }
+.rd-sub-btn { background:#eef2ff; border:1px solid #dbeafe; color:#3730a3; padding:6px 8px; border-radius:8px; font-size:12px; cursor:pointer }
+.rd-sub-btn:hover { background:#e0e7ff }
+
+/* Healthy alternatives list */
+.rd-healthy-list { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px }
+.rd-healthy-item { display:flex; gap:12px; align-items:center }
+.rd-healthy-thumb { width:56px; height:40px; object-fit:cover; border-radius:8px }
+.rd-healthy-info { flex:1 }
+.rd-view-alt { background:#111827; color:#fff; border:none; padding:8px 10px; border-radius:8px; cursor:pointer }
+.rd-view-alt:hover { background:#374151 }
+.rd-empty-small { color:#777; font-size:13px; margin:0 }
