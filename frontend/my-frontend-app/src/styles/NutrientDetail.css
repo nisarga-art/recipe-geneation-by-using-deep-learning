@@ -187,6 +187,72 @@
   margin: 0;
 }
 
+.nd-section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.nd-live-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nd-live-chip {
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.nd-live-chip-live {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.nd-live-chip-fallback {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.nd-refresh-btn {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #374151;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.nd-refresh-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.nd-live-note {
+  margin: -6px 0 0;
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+
+.nd-live-note a {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.nd-live-note a:hover {
+  text-decoration: underline;
+}
+
+.nd-live-error {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
 /* ===== BENEFITS LIST ===== */
 .nd-benefits-list {
   list-style: none;

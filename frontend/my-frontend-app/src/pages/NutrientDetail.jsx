@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import "../styles/NutrientDetail.css";
 import ProfileDropdown from "../components/ProfileDropdown";
@@ -479,6 +479,14 @@ function NutrientDetail() {
   const navigate = useNavigate();
   const { slug } = useParams();
   const n = NUTRIENTS[slug];
+  const API_BASE = useMemo(() => (import.meta.env.VITE_API_URL || "http://127.0.0.1:8000").replace(/\/$/, ""), []);
+  const [liveBenefits, setLiveBenefits] = useState([]);
+  const [benefitsSource, setBenefitsSource] = useState("");
+  const [benefitsSourceUrl, setBenefitsSourceUrl] = useState("");
+  const [benefitsFetchedAt, setBenefitsFetchedAt] = useState("");
+  const [benefitsLoading, setBenefitsLoading] = useState(false);
+  const [benefitsError, setBenefitsError] = useState("");
+  const [benefitsAreLive, setBenefitsAreLive] = useState(false);
 
   if (!n) {
     return (
@@ -490,6 +498,59 @@ function NutrientDetail() {
       </div>
     );
   }
+
+  const loadLiveBenefits = async () => {
+    if (!slug) return;
+
+    setBenefitsLoading(true);
+    setBenefitsError("");
+    setBenefitsSource("");
+    setBenefitsSourceUrl("");
+    setBenefitsFetchedAt("");
+    setBenefitsAreLive(false);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+
+    try {
+      const res = await fetch(`${API_BASE}/health-plan/nutrients/${slug}/live-benefits`, {
+        signal: controller.signal,
+      });
+
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : null;
+
+      if (!res.ok) {
+        throw new Error(data?.detail || `Live endpoint failed with status ${res.status}`);
+      }
+
+      const benefits = Array.isArray(data?.benefits)
+        ? data.benefits.filter((item) => typeof item === "string" && item.trim())
+        : [];
+
+      setLiveBenefits(benefits);
+      setBenefitsSource(data?.source || "");
+      setBenefitsSourceUrl(data?.source_url || "");
+      setBenefitsFetchedAt(data?.fetched_at_utc || "");
+      setBenefitsAreLive(Boolean(data?.is_live));
+    } catch (err) {
+      if (err.name === "AbortError") {
+        setBenefitsError("Live health benefits request timed out. Showing saved details.");
+      } else {
+        setBenefitsError("Live health benefits unavailable. Showing saved details.");
+      }
+      setLiveBenefits([]);
+    } finally {
+      clearTimeout(timeout);
+      setBenefitsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadLiveBenefits();
+  }, [slug]);
+
+  const benefitsToDisplay = liveBenefits.length > 0 ? liveBenefits : n.benefits;
 
   return (
     <div className="nd-page">
@@ -544,12 +605,44 @@ function NutrientDetail() {
 
         {/* Health Benefits */}
         <div className="nd-section">
-          <h3 className="nd-section-title">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={n.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-            Health Benefits
-          </h3>
+          <div className="nd-section-title-row">
+            <h3 className="nd-section-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={n.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+              Health Benefits
+            </h3>
+            <div className="nd-live-actions">
+              <span className={`nd-live-chip ${benefitsAreLive ? "nd-live-chip-live" : "nd-live-chip-fallback"}`}>
+                {benefitsAreLive ? "Live" : "Saved"}
+              </span>
+              <button type="button" className="nd-refresh-btn" onClick={loadLiveBenefits} disabled={benefitsLoading}>
+                {benefitsLoading ? "Refreshing..." : "Refresh"}
+              </button>
+            </div>
+          </div>
+
+          {benefitsError && <p className="nd-live-note nd-live-error">{benefitsError}</p>}
+          {!benefitsError && benefitsLoading && <p className="nd-live-note">Fetching latest health benefits...</p>}
+
+          {!benefitsLoading && benefitsSource && (
+            <p className="nd-live-note">
+              Source: {benefitsSource}
+              {benefitsSourceUrl && (
+                <>
+                  {" "}
+                  <a href={benefitsSourceUrl} target="_blank" rel="noreferrer">reference</a>
+                </>
+              )}
+              {benefitsFetchedAt && (
+                <>
+                  {" "}
+                  • Updated {new Date(benefitsFetchedAt).toLocaleString()}
+                </>
+              )}
+            </p>
+          )}
+
           <ul className="nd-benefits-list">
-            {n.benefits.map((b, i) => (
+            {benefitsToDisplay.map((b, i) => (
               <li key={i}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#eab308" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                 {b}

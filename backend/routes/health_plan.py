@@ -1,9 +1,20 @@
-from fastapi import APIRouter, Depends
+from datetime import datetime, timezone
+import re
+from urllib.parse import quote
+
+import requests
+from fastapi import APIRouter, Depends, HTTPException
 from difflib import get_close_matches
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Recipe
-from schemas import HealthPlanRequest, HealthPlanResponse, FoodRecommendation, RecipeOut
+from schemas import (
+    HealthPlanRequest,
+    HealthPlanResponse,
+    FoodRecommendation,
+    LiveNutrientBenefitsResponse,
+    RecipeOut,
+)
 
 router = APIRouter(prefix="/health-plan", tags=["Health Plan"])
 
@@ -114,6 +125,86 @@ CONDITION_ALIASES = {
 }
 
 
+NUTRIENT_QUERY_TERMS = {
+    "vitamin-c": "Vitamin C",
+    "protein": "Protein (nutrient)",
+    "carbohydrates": "Carbohydrate",
+    "healthy-fats": "Fat",
+    "dietary-fiber": "Dietary fiber",
+    "vitamin-d": "Vitamin D",
+    "iron": "Iron",
+    "calcium": "Calcium",
+    "omega-3": "Omega-3 fatty acid",
+}
+
+
+LOCAL_BENEFIT_FALLBACKS = {
+    "vitamin-c": [
+        "Supports immune function and collagen production.",
+        "Acts as an antioxidant that helps protect cells.",
+        "Improves absorption of non-heme iron from plant foods.",
+    ],
+    "protein": [
+        "Helps build and repair muscle and tissues.",
+        "Supports enzymes, hormones, and immune proteins.",
+        "Can improve satiety and preserve lean mass during weight loss.",
+    ],
+    "carbohydrates": [
+        "Primary energy source for the brain and muscles.",
+        "Complex carbohydrates support steady energy release.",
+        "Fiber-rich carbohydrate foods support gut and metabolic health.",
+    ],
+    "healthy-fats": [
+        "Supports absorption of vitamins A, D, E, and K.",
+        "Contributes to hormone and cell membrane health.",
+        "Unsaturated fats support cardiovascular health.",
+    ],
+    "dietary-fiber": [
+        "Supports healthy digestion and bowel regularity.",
+        "Helps improve satiety and blood sugar stability.",
+        "Can support healthy cholesterol levels.",
+    ],
+    "vitamin-d": [
+        "Supports calcium absorption and bone health.",
+        "Contributes to normal immune function.",
+        "Plays a role in muscle and mood regulation.",
+    ],
+    "iron": [
+        "Essential for hemoglobin and oxygen transport.",
+        "Supports energy metabolism and cognitive performance.",
+        "Important for immune function and physical endurance.",
+    ],
+    "calcium": [
+        "Supports bone and teeth mineralization.",
+        "Needed for muscle contraction and nerve signaling.",
+        "Contributes to normal blood clotting and heart rhythm.",
+    ],
+    "omega-3": [
+        "Supports cardiovascular and brain health.",
+        "Helps regulate inflammatory pathways.",
+        "DHA and EPA are important for vision and cognition.",
+    ],
+}
+
+
+BENEFIT_KEYWORDS = {
+    "health",
+    "immune",
+    "bone",
+    "heart",
+    "brain",
+    "metabolism",
+    "inflammation",
+    "blood",
+    "digest",
+    "muscle",
+    "energy",
+    "disease",
+    "function",
+    "support",
+}
+
+
 def _normalize_text(value: str | None) -> str:
     return (value or "").strip().lower()
 
@@ -171,6 +262,45 @@ def _match_condition(issue: str) -> str | None:
             return close_token[0]
 
     return None
+
+
+def _extract_benefit_sentences(extract_text: str) -> list[str]:
+    if not extract_text:
+        return []
+
+    cleaned = re.sub(r"\s+", " ", extract_text).strip()
+    if not cleaned:
+        return []
+
+    sentences = [piece.strip() for piece in re.split(r"(?<=[.!?])\s+", cleaned) if piece.strip()]
+
+    selected: list[str] = []
+    for sentence in sentences:
+        lowered = sentence.lower()
+        if len(sentence) < 35:
+            continue
+        if any(keyword in lowered for keyword in BENEFIT_KEYWORDS):
+            selected.append(sentence)
+        if len(selected) >= 6:
+            break
+
+    if not selected:
+        selected = [sentence for sentence in sentences if len(sentence) >= 35][:6]
+
+    return selected
+
+
+def _live_benefits_fallback(slug: str) -> LiveNutrientBenefitsResponse:
+    nutrient_label = NUTRIENT_QUERY_TERMS.get(slug, slug.replace("-", " ").title())
+    return LiveNutrientBenefitsResponse(
+        nutrient_slug=slug,
+        nutrient_name=nutrient_label,
+        benefits=LOCAL_BENEFIT_FALLBACKS.get(slug, ["Balanced nutrition supports long-term health."]),
+        source="local-fallback",
+        source_url=None,
+        fetched_at_utc=datetime.now(timezone.utc).isoformat(),
+        is_live=False,
+    )
 
 
 @router.post("/recommendations", response_model=HealthPlanResponse)
@@ -361,4 +491,45 @@ def recommend_for_health_plan(payload: HealthPlanRequest, db: Session = Depends(
         recipes=best_recipes if best_recipes else quick_recipe_fallbacks,
         lifestyle_tips=lifestyle_tips,
         disclaimer="This plan is informational and not a medical diagnosis. For chronic conditions, consult your doctor or dietitian.",
+    )
+
+
+@router.get("/nutrients/{slug}/live-benefits", response_model=LiveNutrientBenefitsResponse)
+def nutrient_live_benefits(slug: str):
+    query_term = NUTRIENT_QUERY_TERMS.get(slug)
+    if not query_term:
+        raise HTTPException(status_code=404, detail="Unsupported nutrient slug")
+
+    encoded = quote(query_term.replace(" ", "_"), safe="")
+    endpoint = f"https://en.wikipedia.org/api/rest_v1/page/summary/{encoded}"
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "RecipeDiscover/1.0 (nutrition live endpoint)",
+    }
+
+    try:
+        response = requests.get(endpoint, headers=headers, timeout=8)
+        response.raise_for_status()
+        payload = response.json()
+    except requests.RequestException:
+        return _live_benefits_fallback(slug)
+
+    benefits = _extract_benefit_sentences(payload.get("extract", ""))
+    if not benefits:
+        return _live_benefits_fallback(slug)
+
+    source_url = None
+    content_urls = payload.get("content_urls") or {}
+    desktop_payload = content_urls.get("desktop") if isinstance(content_urls, dict) else None
+    if isinstance(desktop_payload, dict):
+        source_url = desktop_payload.get("page")
+
+    return LiveNutrientBenefitsResponse(
+        nutrient_slug=slug,
+        nutrient_name=payload.get("title") or query_term,
+        benefits=benefits,
+        source="wikipedia",
+        source_url=source_url,
+        fetched_at_utc=datetime.now(timezone.utc).isoformat(),
+        is_live=True,
     )

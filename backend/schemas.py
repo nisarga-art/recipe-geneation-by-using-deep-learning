@@ -97,3 +97,13 @@ class HealthPlanResponse(BaseModel):
     recipes: List[RecipeOut]
     lifestyle_tips: List[str]
     disclaimer: str
+
+
+class LiveNutrientBenefitsResponse(BaseModel):
+    nutrient_slug: str
+    nutrient_name: str
+    benefits: List[str]
+    source: str
+    source_url: Optional[str] = None
+    fetched_at_utc: str
+    is_live: bool
