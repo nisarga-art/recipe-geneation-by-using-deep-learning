@@ -33,6 +33,12 @@ function findSubstitutes(item) {
   return key ? SUBSTITUTES[key] : [];
 }
 
+function asArray(value) {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (typeof value === "string" && value.trim()) return value.split(/[\n,;]+/).map((part) => part.trim()).filter(Boolean);
+  return [];
+}
+
 function mapHealthTagToSlug(tag) {
   if (!tag) return null;
   const t = tag.toLowerCase();
@@ -131,12 +137,15 @@ function RecipeDetail() {
   const [localRecipe, setLocalRecipe] = useState(null);
 
   const toRecipeView = (data) => {
-    const ingredients = data.ingredients && typeof data.ingredients === "object"
-      ? {
-          available: Array.isArray(data.ingredients.available) ? data.ingredients.available : [],
-          missing: Array.isArray(data.ingredients.missing) ? data.ingredients.missing : [],
-        }
-      : { available: [], missing: [] };
+    const rawIngredients = data.ingredients;
+    const ingredients = Array.isArray(rawIngredients)
+      ? { available: rawIngredients.filter(Boolean), missing: [] }
+      : rawIngredients && typeof rawIngredients === "object"
+        ? {
+            available: asArray(rawIngredients.available),
+            missing: asArray(rawIngredients.missing),
+          }
+        : { available: [], missing: [] };
 
     const nutrition = data.nutrition && typeof data.nutrition === "object"
       ? {
@@ -156,26 +165,28 @@ function RecipeDetail() {
       nutrition.fiber = Math.round(est.fiber || 0);
     }
 
-    const steps = Array.isArray(data.steps) && data.steps.length > 0
-      ? data.steps
+    const steps = asArray(data.steps);
+    const normalizedSteps = steps.length > 0
+      ? steps
       : ["Detailed steps are being updated for this recipe."];
 
     const fallbackImage = "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200&q=80&auto=format&fit=crop";
 
-    setRecipe({
+    const normalizedRecipe = {
       ...data,
       image: data.image || fallbackImage,
       ingredients,
       nutrition,
-      steps,
-      healthBenefits: Array.isArray(data.health_benefits) ? data.health_benefits : [],
-      similarDishes: Array.isArray(data.similar_dishes) ? data.similar_dishes : [],
+      steps: normalizedSteps,
+      healthBenefits: asArray(data.health_benefits),
+      similarDishes: asArray(data.similar_dishes),
+      cultural: data.cultural || "No cultural insight is available for this recipe yet.",
       pantryMatch: data.pantry_match ?? 0,
-    });
-    setLocalRecipe({
-      ...data,
-      ingredients,
-    });
+    };
+
+    setRecipe(normalizedRecipe);
+    // Keep a fully normalized local copy to avoid render-time undefined field crashes.
+    setLocalRecipe(normalizedRecipe);
   };
 
   useEffect(() => {
@@ -430,38 +441,45 @@ function RecipeDetail() {
               <div className="rd-ingredients-col">
                 <p className="rd-ing-heading rd-ing-green">✅ Available in Pantry</p>
                 <ul className="rd-ing-list">
-                  {current.ingredients.available.map((item, i) => (
-                    <li key={i}><span className="rd-dot rd-dot-green" />{item}</li>
-                  ))}
+                  {current.ingredients.available.length > 0 ? (
+                    current.ingredients.available.map((item, i) => (
+                      <li key={i}><span className="rd-dot rd-dot-green" />{item}</li>
+                    ))
+                  ) : (
+                    <li className="rd-empty-line">No ingredient details available yet.</li>
+                  )}
                 </ul>
               </div>
 
               <div className="rd-ingredients-col">
                 <p className="rd-ing-heading rd-ing-red">⊗ Missing Items</p>
                 <ul className="rd-ing-list">
-                  {current.ingredients.missing.map((item, i) => (
-                    <li key={i} className="rd-missing-item">
-                      <span className="rd-dot rd-dot-red" />{item}
-                      <button
-                        className="rd-buy-btn"
-                        onClick={() => setBuyItem(item)}
-                      >🛒 Buy</button>
+                  {current.ingredients.missing.length > 0 ? (
+                    current.ingredients.missing.map((item, i) => (
+                      <li key={i} className="rd-missing-item">
+                        <span className="rd-dot rd-dot-red" />{item}
+                        <button
+                          className="rd-buy-btn"
+                          onClick={() => setBuyItem(item)}
+                        >🛒 Buy</button>
 
-                      {/* Substitutes */}
-                      {(() => {
-                        const subs = findSubstitutes(item);
-                        if (!subs || subs.length === 0) return null;
-                        return (
-                          <div className="rd-substitute-list">
-                            <small>Try substitutes:</small>
-                            {subs.map((s, idx) => (
-                              <button key={idx} className="rd-sub-btn" onClick={() => useSubstitute(item, s)}>{s}</button>
-                            ))}
-                          </div>
-                        );
-                      })()}
-                    </li>
-                  ))}
+                        {(() => {
+                          const subs = findSubstitutes(item);
+                          if (!subs || subs.length === 0) return null;
+                          return (
+                            <div className="rd-substitute-list">
+                              <small>Try substitutes:</small>
+                              {subs.map((s, idx) => (
+                                <button key={idx} className="rd-sub-btn" onClick={() => useSubstitute(item, s)}>{s}</button>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </li>
+                    ))
+                  ) : (
+                    <li className="rd-empty-line">No missing items listed for this recipe.</li>
+                  )}
                 </ul>
               </div>
             </div>
@@ -508,15 +526,19 @@ function RecipeDetail() {
             )}
 
             <ol className="rd-steps">
-              {current.steps.map((step, i) => (
-                <li key={i} className={currentStep === i ? "rd-step-active" : ""}>
-                  <span className="rd-step-num">{i + 1}</span>
-                  <span className="rd-step-text">{step}</span>
-                  {currentStep === i && (
-                    <span className="rd-step-speaking-badge">🔊 Speaking...</span>
-                  )}
-                </li>
-              ))}
+              {current.steps.length > 0 ? (
+                current.steps.map((step, i) => (
+                  <li key={i} className={currentStep === i ? "rd-step-active" : ""}>
+                    <span className="rd-step-num">{i + 1}</span>
+                    <span className="rd-step-text">{step}</span>
+                    {currentStep === i && (
+                      <span className="rd-step-speaking-badge">🔊 Speaking...</span>
+                    )}
+                  </li>
+                ))
+              ) : (
+                <li className="rd-empty-line">No preparation steps are available for this recipe yet.</li>
+              )}
             </ol>
           </div>
 
@@ -549,13 +571,17 @@ function RecipeDetail() {
           <div className="rd-card">
             <h2 className="rd-section-title">Health Benefits</h2>
             <div className="rd-benefit-tags">
-              {current.healthBenefits.map((b, i) => (
-                <button key={i} className="rd-benefit-tag" onClick={() => {
-                  const slug = mapHealthTagToSlug(b);
-                  if (slug) navigate(`/health-guide?focus=${slug}`);
-                  else navigate(`/health-guide?search=${encodeURIComponent(b)}`);
-                }}>{b}</button>
-              ))}
+              {current.healthBenefits.length > 0 ? (
+                current.healthBenefits.map((b, i) => (
+                  <button key={i} className="rd-benefit-tag" onClick={() => {
+                    const slug = mapHealthTagToSlug(b);
+                    if (slug) navigate(`/health-guide?focus=${slug}`);
+                    else navigate(`/health-guide?search=${encodeURIComponent(b)}`);
+                  }}>{b}</button>
+                ))
+              ) : (
+                <span className="rd-empty-inline">No health benefits listed yet.</span>
+              )}
             </div>
             {current.calories <= 350 && (
               <div style={{ marginTop: 12 }}>
@@ -568,9 +594,13 @@ function RecipeDetail() {
           <div className="rd-card">
             <h2 className="rd-section-title">Similar Dishes</h2>
             <ul className="rd-similar-list">
-              {current.similarDishes.map((d, i) => (
-                <li key={i} className="rd-similar-item">{d}</li>
-              ))}
+              {current.similarDishes.length > 0 ? (
+                current.similarDishes.map((d, i) => (
+                  <li key={i} className="rd-similar-item">{d}</li>
+                ))
+              ) : (
+                <li className="rd-empty-line">No similar dishes listed yet.</li>
+              )}
             </ul>
           </div>
 

@@ -631,3 +631,5 @@
 .rd-view-alt { background:#111827; color:#fff; border:none; padding:8px 10px; border-radius:8px; cursor:pointer }
 .rd-view-alt:hover { background:#374151 }
 .rd-empty-small { color:#777; font-size:13px; margin:0 }
+.rd-empty-line { color:#777; font-size:14px; list-style:none; padding:4px 0 }
+.rd-empty-inline { color:#777; font-size:13px }
