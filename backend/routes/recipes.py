@@ -6,6 +6,8 @@ from database import get_db
 from models import Recipe
 from schemas import RecipeOut
 from clarifai_service import search_concepts_for_text
+from rag_service import build_index_from_recipes, save_index
+from tasks import enqueue_reindex, get_job_status
 
 router = APIRouter(prefix="/recipes", tags=["Recipes"])
 VIRTUAL_RECIPES_CACHE: dict[int, RecipeOut] = {}
@@ -426,3 +428,24 @@ def get_all_recipes(
 
     # If not searching or cuisine filtering, return local DB results.
     return local_results
+
+
+@router.post("/reindex")
+def reindex_recipes(db: Session = Depends(get_db)):
+    """Enqueue a background reindex job (FAISS). Returns job id to track status."""
+    # ensure DB reachable
+    _ = db.query(Recipe).first()
+    try:
+        job_id = enqueue_reindex()
+        return {"status": "enqueued", "job_id": job_id}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/reindex/{job_id}")
+def reindex_status(job_id: str):
+    """Get status for a previously enqueued reindex job."""
+    status = get_job_status(job_id)
+    if status.get("status") == "not_found":
+        raise HTTPException(status_code=404, detail="Job not found")
+    return status

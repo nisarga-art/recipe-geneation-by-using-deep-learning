@@ -20,6 +20,15 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24   # 24 hours
 
+    # Flan-T5 model (open-source LLM) settings
+    FLAN_MODEL_NAME: str = "google/flan-t5-base"
+    FLAN_MAX_TOKENS: int = 512
+    FLAN_TEMPERATURE: float = 0.7
+    # If you have GPU and want to use it, set FLAN_USE_CUDA=true in .env
+    FLAN_USE_CUDA: bool = False
+    # Redis for background jobs (RQ)
+    REDIS_URL: str = "redis://localhost:6379/0"
+
     class Config:
         env_file = ".env"
 

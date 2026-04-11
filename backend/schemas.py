@@ -71,6 +71,9 @@ class AnalyzeResult(BaseModel):
     detected_labels: List[str]
     confidence_scores: List[float]
     matched_recipe: Optional[RecipeOut]
+    generated_recipe: Optional[str]
+    generated_recipe_json: Optional[Any]
+    debug_info: Optional[Any]
     message: str
 
 

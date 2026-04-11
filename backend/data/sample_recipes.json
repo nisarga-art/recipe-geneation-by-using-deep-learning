@@ -1,0 +1,34 @@
+[
+  {
+    "id": 1,
+    "title": "Simple Tomato Pasta",
+    "ingredients": [
+      {"name": "pasta", "quantity": 200, "unit": "g"},
+      {"name": "tomato", "quantity": 3, "unit": "pcs"},
+      {"name": "olive oil", "quantity": 2, "unit": "tbsp"},
+      {"name": "garlic", "quantity": 2, "unit": "cloves"}
+    ],
+    "steps": [
+      "Boil pasta until al dente.",
+      "Saute garlic in olive oil, add chopped tomatoes and simmer.",
+      "Toss pasta with sauce and serve."
+    ],
+    "nutrition": {"calories": 450, "protein": 12, "carbs": 60, "fat": 14}
+  },
+  {
+    "id": 2,
+    "title": "Greek Salad",
+    "ingredients": [
+      {"name": "cucumber", "quantity": 1, "unit": "pcs"},
+      {"name": "tomato", "quantity": 2, "unit": "pcs"},
+      {"name": "feta cheese", "quantity": 100, "unit": "g"},
+      {"name": "olive oil", "quantity": 1, "unit": "tbsp"}
+    ],
+    "steps": [
+      "Chop vegetables and assemble in a bowl.",
+      "Crumble feta on top and drizzle olive oil.",
+      "Season with salt and oregano."
+    ],
+    "nutrition": {"calories": 320, "protein": 8, "carbs": 10, "fat": 28}
+  }
+]
