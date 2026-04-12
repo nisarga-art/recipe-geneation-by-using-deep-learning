@@ -1,8 +1,8 @@
-.rm-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:1200}
-.rm-modal{background:#fff;max-width:900px;width:96%;max-height:90vh;overflow:auto;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,0.3);position:relative;padding:1rem}
-.rm-close{position:absolute;right:12px;top:12px;border:0;background:#eee;padding:6px 8px;border-radius:6px;cursor:pointer}
+.rm-overlay{position:fixed;inset:0;background:rgba(10,14,25,0.5);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:1200}
+.rm-modal{background:rgba(255,255,255,0.95);backdrop-filter:blur(10px);border:1px solid rgba(255,106,0,0.12);max-width:900px;width:96%;max-height:90vh;overflow:auto;border-radius:14px;box-shadow:0 16px 48px rgba(0,0,0,0.2);position:relative;padding:1rem}
+.rm-close{position:absolute;right:12px;top:12px;border:0;background:rgba(255,106,0,0.1);color:#ff6a00;padding:6px 8px;border-radius:8px;cursor:pointer;transition:all .3s ease}
 .rm-hero{display:flex;gap:1rem;align-items:center}
-.rm-image{width:160px;height:110px;object-fit:cover;border-radius:8px}
+.rm-image{width:160px;height:110px;object-fit:cover;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,0.12)}
 .rm-hero-info{flex:1}
 .rm-title{margin:0 0 .25rem}
 .rm-meta{color:#666;font-size:.9rem}
@@ -12,3 +12,5 @@
 .rm-ingredients ul{margin:0;padding-left:1.2rem}
 .rm-steps{padding-left:1.2rem}
 .rm-empty{color:#777;list-style:none;padding:.25rem 0}
+
+.rm-close:hover{background:#ff6a00;color:#fff;transform:translateY(-1px)}

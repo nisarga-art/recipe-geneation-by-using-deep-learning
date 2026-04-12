@@ -1,7 +1,7 @@
 /* -- Page wrapper ------------------------------------------- */
 .rl-page {
   min-height: 100vh;
-  background: #f5f7fb;
+  background: linear-gradient(135deg, #f8f9fc 0%, #f3f4f8 100%);
   font-family: "Inter", "Segoe UI", sans-serif;
 }
 
@@ -13,7 +13,7 @@
 
 .rl-title {
   font-size: 2.2rem;
-  font-weight: 700;
+  font-weight: 800;
   color: #1a1a2e;
   margin: 0 0 8px;
 }
@@ -59,23 +59,25 @@
 .rl-pill {
   padding: 6px 14px;
   border-radius: 20px;
-  border: 1.5px solid #e5e7eb;
-  background: #fff;
+  border: 1.5px solid rgba(255,106,0,0.2);
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(6px);
   color: #374151;
   font-size: 0.82rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition: all 0.3s ease;
 }
 
 .rl-pill:hover {
-  border-color: #ff5a00;
-  color: #ff5a00;
+  border-color: #ff6a00;
+  color: #fff;
+  background: linear-gradient(135deg, #ff6a00 0%, #ff8c00 100%);
 }
 
 .rl-pill.active {
-  background: #ff5a00;
-  border-color: #ff5a00;
+  background: linear-gradient(135deg, #ff6a00 0%, #ff8c00 100%);
+  border-color: #ff6a00;
   color: #fff;
 }
 
@@ -116,18 +118,21 @@
 
 /* -- Card --------------------------------------------------- */
 .rl-card {
-  background: #fff;
+  background: rgba(255,255,255,0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,106,0,0.1);
   border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
   transition: transform 0.2s, box-shadow 0.2s;
   display: flex;
   flex-direction: column;
 }
 
 .rl-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 28px rgba(255, 90, 0, 0.15);
+  transform: translateY(-6px);
+  box-shadow: 0 12px 32px rgba(255,106,0,0.2);
+  border-color: rgba(255,106,0,0.3);
 }
 
 /* -- Card image --------------------------------------------- */
@@ -231,10 +236,50 @@
   padding: 9px 12px;
   cursor: pointer;
   transition: background 0.15s;
+  margin-bottom: 10px;
 }
 
 .rl-open-btn:hover {
   background: #ffd8bf;
+}
+
+.rl-order-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rl-order-quick-btn {
+  flex: 1;
+  min-width: 85px;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  color: white;
+}
+
+.rl-order-quick-btn:first-child {
+  background: linear-gradient(135deg, #f1511b, #ff6b35);
+  box-shadow: 0 2px 8px rgba(241, 81, 27, 0.25);
+}
+
+.rl-order-quick-btn:first-child:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(241, 81, 27, 0.35);
+}
+
+.rl-order-quick-btn:last-child {
+  background: linear-gradient(135deg, #d73008, #ef4444);
+  box-shadow: 0 2px 8px rgba(215, 48, 8, 0.25);
+}
+
+.rl-order-quick-btn:last-child:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(215, 48, 8, 0.35);
 }
 
 /* -- Navbar favorites icon ---------------------------------- */
@@ -250,20 +295,22 @@
   height: 38px;
   border-radius: 50%;
   border: none;
-  background: #fff0e6;
+  background: linear-gradient(135deg, rgba(255,106,0,0.15) 0%, rgba(255,140,0,0.1) 100%);
+  border: 2px solid rgba(255,106,0,0.2);
   color: #e53e3e;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.18s, transform 0.15s;
+  transition: all 0.3s ease;
   padding: 0;
 }
 
 .rl-nav-fav-btn:hover,
 .rl-nav-fav-btn.open {
-  background: #ffe0cc;
-  transform: scale(1.08);
+  background: linear-gradient(135deg, #ff6a00 0%, #ff8c00 100%);
+  transform: scale(1.1);
+  border-color: #ff6a00;
 }
 
 .rl-nav-fav-badge {
@@ -289,9 +336,11 @@
   top: calc(100% + 10px);
   right: 0;
   width: 320px;
-  background: #fff;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,106,0,0.1);
   border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.14);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.12);
   z-index: 200;
   overflow: hidden;
   animation: rl-fade-drop 0.18s ease;

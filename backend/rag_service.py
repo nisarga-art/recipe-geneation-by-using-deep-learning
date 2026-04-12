@@ -1,6 +1,17 @@
-from sentence_transformers import SentenceTransformer
-import numpy as np
-import faiss
+try:
+    from sentence_transformers import SentenceTransformer
+except Exception:
+    SentenceTransformer = None
+
+try:
+    import numpy as np
+except Exception:
+    np = None
+
+try:
+    import faiss
+except Exception:
+    faiss = None
 import json
 from typing import List, Dict, Optional
 
@@ -24,14 +35,14 @@ def build_index_from_recipes(recipes: List[Dict], model_name: str = "all-MiniLM-
     """
     global _INDEX, _METADATA
     model = _load_embed_model(model_name)
-from sentence_transformers import SentenceTransformer
-import numpy as np
-import faiss
+import requests
 import json
 from typing import List, Dict, Optional
-import requests
 from io import BytesIO
-from PIL import Image
+try:
+    from PIL import Image
+except Exception:
+    Image = None
 
 # Text embedding model (sentence-transformers)
 _TEXT_MODEL = None
@@ -46,6 +57,8 @@ _IMG_METADATA: List[Dict] = []
 
 def _load_text_model(model_name: str = "all-MiniLM-L6-v2"):
     global _TEXT_MODEL
+    if SentenceTransformer is None:
+        raise RuntimeError("sentence-transformers is not installed")
     if _TEXT_MODEL is None:
         _TEXT_MODEL = SentenceTransformer(model_name)
     return _TEXT_MODEL
@@ -53,6 +66,8 @@ def _load_text_model(model_name: str = "all-MiniLM-L6-v2"):
 
 def _load_image_model(model_name: str = "clip-ViT-B-32"):
     global _IMG_MODEL
+    if SentenceTransformer is None:
+        raise RuntimeError("sentence-transformers is not installed")
     if _IMG_MODEL is None:
         # SentenceTransformer supports CLIP variants for image embeddings
         _IMG_MODEL = SentenceTransformer(model_name)
@@ -60,6 +75,8 @@ def _load_image_model(model_name: str = "clip-ViT-B-32"):
 
 
 def _download_image(url: str) -> Optional[Image.Image]:
+    if Image is None:
+        return None
     try:
         resp = requests.get(url, timeout=6)
         resp.raise_for_status()
@@ -75,6 +92,8 @@ def build_index_from_recipes(recipes: List[Dict], text_model_name: str = "all-Mi
     This function creates/upates both text and image indices and metadata.
     """
     global _TEXT_INDEX, _TEXT_METADATA, _IMG_INDEX, _IMG_METADATA
+    if np is None or faiss is None:
+        raise RuntimeError("numpy/faiss are not installed")
 
     # Build text index
     text_model = _load_text_model(text_model_name)
@@ -139,6 +158,8 @@ def build_index_from_recipes(recipes: List[Dict], text_model_name: str = "all-Mi
 
 def save_index(index_path: str, meta_path: str, img_index_path: Optional[str] = None, img_meta_path: Optional[str] = None) -> None:
     global _TEXT_INDEX, _TEXT_METADATA, _IMG_INDEX, _IMG_METADATA
+    if faiss is None:
+        raise RuntimeError("faiss is not installed")
     if _TEXT_INDEX is None:
         raise RuntimeError("Text index not built")
     faiss.write_index(_TEXT_INDEX, index_path)
@@ -153,6 +174,8 @@ def save_index(index_path: str, meta_path: str, img_index_path: Optional[str] = 
 
 def load_index(index_path: str, meta_path: str, img_index_path: Optional[str] = None, img_meta_path: Optional[str] = None, text_model_name: str = "all-MiniLM-L6-v2", img_model_name: str = "clip-ViT-B-32") -> None:
     global _TEXT_INDEX, _TEXT_METADATA, _IMG_INDEX, _IMG_METADATA
+    if faiss is None:
+        raise RuntimeError("faiss is not installed")
     _load_text_model(text_model_name)
     _TEXT_INDEX = faiss.read_index(index_path)
     with open(meta_path, "r", encoding="utf-8") as f:
@@ -171,6 +194,8 @@ def search(query: str, top_k: int = 5, image_bytes: Optional[bytes] = None, imag
     If `image_bytes` is provided, the function searches the image index and merges scores with text index using `image_weight`.
     """
     global _TEXT_INDEX, _TEXT_METADATA, _IMG_INDEX, _IMG_METADATA
+    if np is None or faiss is None:
+        raise RuntimeError("numpy/faiss are not installed")
     if _TEXT_INDEX is None:
         raise RuntimeError("Text index not initialized. Call build_index_from_recipes or load_index first.")
 

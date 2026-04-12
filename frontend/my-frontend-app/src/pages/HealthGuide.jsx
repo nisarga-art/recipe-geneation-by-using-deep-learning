@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "../styles/HealthGuide.css";
 import ProfileDropdown from "../components/ProfileDropdown";
@@ -60,6 +60,132 @@ const nutrients = [
   }
 ];
 
+const nutrientArticles = {
+  "vitamin-c": {
+    title: "NIH: Vitamin C Fact Sheet",
+    url: "https://ods.od.nih.gov/factsheets/VitaminC-Consumer/",
+  },
+  protein: {
+    title: "Harvard: Protein Guide",
+    url: "https://www.hsph.harvard.edu/nutritionsource/what-should-you-eat/protein/",
+  },
+  carbohydrates: {
+    title: "Harvard: Carbohydrates and Health",
+    url: "https://www.hsph.harvard.edu/nutritionsource/carbohydrates/",
+  },
+  "healthy-fats": {
+    title: "Harvard: Fats and Cholesterol",
+    url: "https://www.hsph.harvard.edu/nutritionsource/what-should-you-eat/fats-and-cholesterol/",
+  },
+  "dietary-fiber": {
+    title: "Mayo Clinic: Fiber Benefits",
+    url: "https://www.mayoclinic.org/healthy-lifestyle/nutrition-and-healthy-eating/in-depth/fiber/art-20043983",
+  },
+  "vitamin-d": {
+    title: "NIH: Vitamin D Fact Sheet",
+    url: "https://ods.od.nih.gov/factsheets/VitaminD-Consumer/",
+  },
+  iron: {
+    title: "NIH: Iron Fact Sheet",
+    url: "https://ods.od.nih.gov/factsheets/Iron-Consumer/",
+  },
+  calcium: {
+    title: "NIH: Calcium Fact Sheet",
+    url: "https://ods.od.nih.gov/factsheets/Calcium-Consumer/",
+  },
+  "omega-3": {
+    title: "NIH: Omega-3 Fact Sheet",
+    url: "https://ods.od.nih.gov/factsheets/Omega3FattyAcids-Consumer/",
+  },
+};
+
+const concernArticles = [
+  {
+    key: "diabetes",
+    keywords: ["diabetes", "diabetic", "blood sugar", "insulin"],
+    title: "WHO: Diabetes Overview",
+    url: "https://www.who.int/news-room/fact-sheets/detail/diabetes",
+  },
+  {
+    key: "hypertension",
+    keywords: ["hypertension", "blood pressure", "high bp"],
+    title: "WHO: Hypertension Facts",
+    url: "https://www.who.int/news-room/fact-sheets/detail/hypertension",
+  },
+  {
+    key: "cholesterol",
+    keywords: ["cholesterol", "ldl", "triglycerides"],
+    title: "NHLBI: High Blood Cholesterol",
+    url: "https://www.nhlbi.nih.gov/health/high-blood-cholesterol",
+  },
+  {
+    key: "weight loss",
+    keywords: ["weight loss", "obesity", "overweight"],
+    title: "CDC: Healthy Weight Basics",
+    url: "https://www.cdc.gov/healthy-weight-growth/about/index.html",
+  },
+  {
+    key: "heart health",
+    keywords: ["heart healthy", "heart", "cardio", "cardiovascular"],
+    title: "WHO: Cardiovascular Diseases",
+    url: "https://www.who.int/news-room/fact-sheets/detail/cardiovascular-diseases-(cvds)",
+  },
+  {
+    key: "muscle gain",
+    keywords: ["muscle gain", "muscle", "high protein", "protein"],
+    title: "Mayo Clinic: Protein Needs",
+    url: "https://www.mayoclinic.org/healthy-lifestyle/nutrition-and-healthy-eating/in-depth/protein/art-20046958",
+  },
+  {
+    key: "acidity",
+    keywords: ["acidity", "acid reflux", "gerd", "heartburn"],
+    title: "NIDDK: Acid Reflux and GERD",
+    url: "https://www.niddk.nih.gov/health-information/digestive-diseases/acid-reflux-ger-gerd-adults",
+  },
+  {
+    key: "thyroid",
+    keywords: ["thyroid", "hypothyroid", "hyperthyroid", "tsh"],
+    title: "NIDDK: Thyroid Disease",
+    url: "https://www.niddk.nih.gov/health-information/endocrine-diseases/thyroid-disease",
+  },
+  {
+    key: "pcos",
+    keywords: ["pcos", "pcod", "polycystic"],
+    title: "NIH: PCOS Overview",
+    url: "https://www.nichd.nih.gov/health/topics/pcos",
+  },
+  {
+    key: "vegan",
+    keywords: ["vegan", "vegetarian", "plant based", "plant-based"],
+    title: "Harvard: Healthy Plant-Based Diet",
+    url: "https://www.health.harvard.edu/staying-healthy/becoming-a-vegetarian",
+  },
+];
+
+const collectRelatedArticles = (plannerForm, plannerResult) => {
+  if (!plannerResult) {
+    return [];
+  }
+
+  const combinedText = [
+    plannerForm.healthIssues,
+    plannerForm.dietGoal,
+    plannerForm.preferences,
+    plannerResult.summary,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  const matched = concernArticles.filter((article) =>
+    article.keywords.some((keyword) => combinedText.includes(keyword)),
+  );
+
+  const fallback = matched.length ? matched : concernArticles.slice(0, 3);
+
+  return fallback.slice(0, 4);
+};
+
 // Mock analysis: randomly picks 2-4 "missing" nutrients to simulate detection
 function analyzeImage() {
   const shuffled = [...nutrients].sort(() => 0.5 - Math.random());
@@ -109,6 +235,11 @@ function HealthGuide() {
         n.ingredients.some(ing => ing.toLowerCase().includes(search.toLowerCase()))
       )
     : nutrients;
+
+  const plannerRelatedArticles = useMemo(
+    () => collectRelatedArticles(plannerForm, plannerResult),
+    [plannerForm, plannerResult],
+  );
 
   const handleFile = (file) => {
     if (!file || !file.type.startsWith("image/")) return;
@@ -248,6 +379,10 @@ function HealthGuide() {
           <a onClick={() => navigate("/recipes")}>{NAVBAR_SVG.recipes} Recipes</a>
           <a onClick={() => navigate("/menus")}>{NAVBAR_SVG.menus} Menus</a>
           <a className="active">{NAVBAR_SVG.health} Health Guide</a>
+          <a onClick={() => navigate("/generate-recipe")} style={{cursor:"pointer"}}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.912 3.874L18 8.786l-3 2.924.708 4.138L12 13.85l-3.708 1.998L9 11.71 6 8.786l4.088-1.912z"/></svg>
+            Generate
+          </a>
         </div>
         <div className="search-box">
           {NAVBAR_SVG.search}
@@ -427,6 +562,24 @@ function HealthGuide() {
                 </div>
               )}
 
+              {plannerRelatedArticles.length > 0 && (
+                <div className="hg-plan-articles">
+                  <h3>Related Health Articles</h3>
+                  <div className="hg-plan-article-links">
+                    {plannerRelatedArticles.map((article) => (
+                      <a
+                        key={article.key}
+                        href={article.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {article.title}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <p className="hg-plan-disclaimer">{plannerResult.disclaimer}</p>
             </div>
           )}
@@ -509,6 +662,16 @@ function HealthGuide() {
                         </li>
                       ))}
                     </ul>
+                    {nutrientArticles[n.slug] ? (
+                      <a
+                        className="hg-article-link"
+                        href={nutrientArticles[n.slug].url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Read: {nutrientArticles[n.slug].title}
+                      </a>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -535,9 +698,21 @@ function HealthGuide() {
               </span>
               <h3 className="hg-nutrient-name">{n.name}</h3>
               <p className="hg-nutrient-desc">{n.desc}</p>
-              <button className="hg-learn-btn" style={{ color: n.color }} onClick={() => navigate("/nutrient/" + n.slug)}>
-                Learn More &rsaquo;
-              </button>
+              <div className="hg-nutrient-actions">
+                <button className="hg-learn-btn" style={{ color: n.color }} onClick={() => navigate("/nutrient/" + n.slug)}>
+                  Learn More &rsaquo;
+                </button>
+                {nutrientArticles[n.slug] ? (
+                  <a
+                    className="hg-article-link"
+                    href={nutrientArticles[n.slug].url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Health Article
+                  </a>
+                ) : null}
+              </div>
             </div>
           ))}
         </div>

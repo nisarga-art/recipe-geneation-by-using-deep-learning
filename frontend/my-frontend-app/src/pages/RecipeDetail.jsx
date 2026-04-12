@@ -92,6 +92,57 @@ const PLATFORMS = [
   },
 ];
 
+const ORDER_PLATFORMS = [
+  {
+    name: "Swiggy",
+    color: "#f1511b",
+    logo: "🛵",
+    url: (recipeName) =>
+      `https://www.swiggy.com/search?query=${encodeURIComponent(recipeName)}`,
+  },
+  {
+    name: "Zomato",
+    color: "#d73008",
+    logo: "🍽️",
+    url: (recipeName) =>
+      `https://www.zomato.com/search?query=${encodeURIComponent(recipeName)}`,
+  },
+];
+
+function OrderModal({ recipeName, onClose }) {
+  return (
+    <div className="rd-modal-overlay" onClick={onClose}>
+      <div className="rd-modal" onClick={e => e.stopPropagation()}>
+        <div className="rd-modal-header">
+          <div>
+            <p className="rd-modal-label">Order Online</p>
+            <h3 className="rd-modal-item">{recipeName}</h3>
+            <p className="rd-modal-sub">Find this dish from nearby restaurants</p>
+          </div>
+          <button className="rd-modal-close" onClick={onClose}>✕</button>
+        </div>
+        <p className="rd-modal-hint">Choose a delivery platform:</p>
+        <div className="rd-platform-list">
+          {ORDER_PLATFORMS.map(p => (
+            <a
+              key={p.name}
+              className="rd-platform-btn"
+              href={p.url(recipeName)}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ "--platform-color": p.color }}
+            >
+              <span className="rd-platform-logo">{p.logo}</span>
+              <span className="rd-platform-name">{p.name}</span>
+              <span className="rd-platform-arrow">→</span>
+            </a>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BuyModal({ item, recipeName, onClose }) {
   return (
     <div className="rd-modal-overlay" onClick={onClose}>
@@ -134,6 +185,7 @@ function RecipeDetail() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [buyItem, setBuyItem] = useState(null);
+  const [orderOpen, setOrderOpen] = useState(false);
   const [localRecipe, setLocalRecipe] = useState(null);
 
   const toRecipeView = (data) => {
@@ -400,6 +452,13 @@ function RecipeDetail() {
         />
       )}
 
+      {orderOpen && (
+        <OrderModal
+          recipeName={current ? current.title : recipe.title}
+          onClose={() => setOrderOpen(false)}
+        />
+      )}
+
       {/* Header */}
       <div className="rd-header">
         <button className="rd-back-btn" onClick={() => navigate(-1)}>
@@ -423,6 +482,23 @@ function RecipeDetail() {
               onClick={() => { if (current.calories <= 350) navigate(`/health-guide?topic=low-calorie`); }}
             >🔥 {current.calories} kcal</span>
             <span>🍽 {current.meal}</span>
+          </div>
+
+          <div className="rd-order-buttons">
+            <button 
+              className="rd-order-btn rd-swiggy-btn" 
+              onClick={() => setOrderOpen(true)}
+              title="Order from Swiggy"
+            >
+              🛵 Order on Swiggy
+            </button>
+            <button 
+              className="rd-order-btn rd-zomato-btn" 
+              onClick={() => setOrderOpen(true)}
+              title="Order from Zomato"
+            >
+              🍽️ Order on Zomato
+            </button>
           </div>
         </div>
       </div>
@@ -489,16 +565,25 @@ function RecipeDetail() {
           <div className="rd-card">
             <div className="rd-instructions-header">
               <h2 className="rd-section-title" style={{margin:0}}>Cooking Instructions</h2>
-              {!voiceActive ? (
-                <button className="rd-voice-start-btn" onClick={startVoice}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1a4 4 0 0 1 4 4v7a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm0 2a2 2 0 0 0-2 2v7a2 2 0 0 0 4 0V5a2 2 0 0 0-2-2zm-7 8a1 1 0 0 1 1 1 7 7 0 0 0 14 0 1 1 0 1 1 2 0 9 9 0 0 1-8 8.94V22h3a1 1 0 1 1 0 2H7a1 1 0 1 1 0-2h3v-1.06A9 9 0 0 1 2 12a1 1 0 0 1 1-1z"/></svg>
-                  🎙 Start Voice Guide
+              <div className="rd-header-buttons">
+                <button 
+                  className="rd-youtube-btn" 
+                  onClick={() => window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(current.title + ' recipe')}`, '_blank')}
+                  title="Watch recipe videos on YouTube"
+                >
+                  ▶ YouTube
                 </button>
-              ) : (
-                <button className="rd-voice-stop-btn" onClick={stopVoice}>
-                  ✕ Stop Voice
-                </button>
-              )}
+                {!voiceActive ? (
+                  <button className="rd-voice-start-btn" onClick={startVoice}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1a4 4 0 0 1 4 4v7a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm0 2a2 2 0 0 0-2 2v7a2 2 0 0 0 4 0V5a2 2 0 0 0-2-2zm-7 8a1 1 0 0 1 1 1 7 7 0 0 0 14 0 1 1 0 1 1 2 0 9 9 0 0 1-8 8.94V22h3a1 1 0 1 1 0 2H7a1 1 0 1 1 0-2h3v-1.06A9 9 0 0 1 2 12a1 1 0 0 1 1-1z"/></svg>
+                    🎙 Start Voice Guide
+                  </button>
+                ) : (
+                  <button className="rd-voice-stop-btn" onClick={stopVoice}>
+                    ✕ Stop Voice
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Voice Player Bar */}

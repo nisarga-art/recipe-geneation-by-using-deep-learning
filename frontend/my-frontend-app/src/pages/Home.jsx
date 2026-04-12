@@ -11,12 +11,13 @@ function Home() {
 
   const goToDashboard = () => navigate("/dashboard");
   const goToMenus = () => navigate("/menus");
+  const goToGenerator = () => navigate("/generate-recipe");
 
   return (
     <div>
       <Hero onExplore={goToDashboard} />
       <Features onExplore={goToDashboard} />
-      <QuickNavigation onBrowse={goToDashboard} onMenus={goToMenus} />
+      <QuickNavigation onBrowse={goToDashboard} onMenus={goToMenus} onGenerate={goToGenerator} />
       <Stats />
     </div>
   );

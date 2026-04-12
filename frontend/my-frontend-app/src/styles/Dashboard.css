@@ -1,7 +1,8 @@
 body{
-font-family: Arial;
-background:#f5f5f5;
+font-family: 'Segoe UI', 'Roboto', '-apple-system', 'BlinkMacSystemFont', sans-serif;
+background: linear-gradient(135deg, #f8f9fc 0%, #f3f4f8 100%);
 margin:0;
+color: #1f2937;
 }
 
 .dashboard{
@@ -17,42 +18,64 @@ z-index:100;
 display:flex;
 justify-content:space-between;
 align-items:center;
-padding:15px 40px;
-background:white;
-box-shadow:0 2px 10px rgba(0,0,0,0.1);
+padding:18px 40px;
+background: linear-gradient(135deg, #ffffff 0%, #f9f9ff 100%);
+box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+backdrop-filter: blur(10px);
 }
 
 .logo{
-font-weight:bold;
-font-size:20px;
-color:#ff6a00;
+font-weight:800;
+font-size:24px;
+background: linear-gradient(135deg, #ff6a00 0%, #ff8c00 100%);
+-webkit-background-clip: text;
+-webkit-text-fill-color: transparent;
+background-clip: text;
+letter-spacing: -0.5px;
 }
 
 .nav-links a{
 display:inline-flex;
 align-items:center;
 gap:6px;
-margin:0 10px;
-color:#555;
+margin:0 8px;
+color:#6b7280;
 cursor:pointer;
 font-size:14px;
 font-weight:500;
 text-decoration:none;
+transition: all 0.3s ease;
+padding: 8px 12px;
+border-radius: 8px;
+}
+
+.nav-links a:hover{
+color:#ff6a00;
+background: rgba(255,106,0,0.1);
 }
 
 .nav-links .active{
 color:#ff6a00;
-font-weight:600;
+font-weight:700;
+background: linear-gradient(135deg, rgba(255,106,0,0.15) 0%, rgba(255,140,0,0.1) 100%);
 }
 
 .search-box{
 display:flex;
 align-items:center;
-background:#f2f2f5;
+background: rgba(248,249,252,0.8);
+border: 1.5px solid rgba(255,106,0,0.2);
 border-radius:24px;
-padding:8px 16px;
+padding:10px 16px;
 gap:8px;
 width:280px;
+transition: all 0.3s ease;
+}
+
+.search-box:focus-within{
+border-color: rgba(255,106,0,0.5);
+background: rgba(255,106,0,0.05);
+box-shadow: 0 4px 12px rgba(255,106,0,0.15);
 }
 
 .search-icon{
@@ -66,6 +89,7 @@ outline:none;
 font-size:14px;
 color:#333;
 width:100%;
+font-weight: 500;
 }
 
 .nav-avatar{
@@ -89,14 +113,17 @@ flex:1;
 .sidebar{
 width:220px;
 min-width:220px;
-background:white;
-padding:20px;
-border-radius:10px;
+background: rgba(255,255,255,0.8);
+backdrop-filter: blur(10px);
+border: 1px solid rgba(255,106,0,0.1);
+padding:24px;
+border-radius:16px;
 margin-right:20px;
 position:sticky;
-top:80px;
-max-height:calc(100vh - 100px);
+top:100px;
+max-height:calc(100vh - 120px);
 overflow-y:auto;
+box-shadow: 0 8px 24px rgba(0,0,0,0.06);
 }
 
 .filter-group{
@@ -160,19 +187,21 @@ display:block;
 width:100%;
 margin-top:24px;
 padding:14px 0;
-background:#ff6a00;
+background: linear-gradient(135deg, #ff6a00 0%, #ff8c00 100%);
 color:white;
 border:none;
-border-radius:10px;
+border-radius:12px;
 font-size:15px;
-font-weight:600;
+font-weight:700;
 cursor:pointer;
 letter-spacing:0.3px;
-transition:background 0.2s;
+transition: all 0.3s ease;
+box-shadow: 0 4px 15px rgba(255,106,0,0.3);
 }
 
 .apply-filters-btn:hover{
-background:#e65a00;
+transform: translateY(-2px);
+box-shadow: 0 6px 20px rgba(255,106,0,0.4);
 }
 
 .main{
@@ -180,18 +209,19 @@ flex:1;
 }
 
 .upload-box{
-border:2px dashed #d0d0d0;
+border:2px dashed rgba(255,106,0,0.3);
 padding:60px 40px;
 text-align:center;
 border-radius:16px;
-background:#f8f9fb;
+background: linear-gradient(135deg, rgba(255,106,0,0.05) 0%, rgba(255,140,0,0.03) 100%);
 margin-bottom:30px;
 cursor:pointer;
-transition:border-color 0.2s;
+transition: all 0.3s ease;
 }
 
 .upload-box:hover{
 border-color:#ff6a00;
+background: linear-gradient(135deg, rgba(255,106,0,0.1) 0%, rgba(255,140,0,0.05) 100%);
 }
 
 .upload-icon-circle{

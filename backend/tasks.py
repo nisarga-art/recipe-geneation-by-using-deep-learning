@@ -1,12 +1,21 @@
-from redis import Redis
-from rq import Queue, Job
+try:
+    from redis import Redis
+    from rq import Queue, Job
+except Exception:
+    Redis = None
+    Queue = None
+    Job = None
 from config import settings
 from rag_service import build_index_from_recipes, save_index
 from database import SessionLocal
 from models import Recipe
 
-redis_conn = Redis.from_url(settings.REDIS_URL)
-queue = Queue("default", connection=redis_conn)
+if Redis is not None and Queue is not None:
+    redis_conn = Redis.from_url(settings.REDIS_URL)
+    queue = Queue("default", connection=redis_conn)
+else:
+    redis_conn = None
+    queue = None
 
 
 def _reindex_job():
@@ -26,11 +35,15 @@ def _reindex_job():
 
 
 def enqueue_reindex():
+    if queue is None:
+        return "queue_unavailable"
     job = queue.enqueue(_reindex_job)
     return job.get_id()
 
 
 def get_job_status(job_id: str) -> dict:
+    if Job is None or redis_conn is None:
+        return {"status": "queue_unavailable", "id": job_id}
     try:
         job = Job.fetch(job_id, connection=redis_conn)
     except Exception:

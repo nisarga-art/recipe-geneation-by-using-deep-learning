@@ -1,5 +1,3 @@
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-import torch
 from config import settings
 from typing import Optional
 
@@ -11,6 +9,15 @@ def _load_model():
     global _MODEL, _TOKENIZER
     if _MODEL is not None and _TOKENIZER is not None:
         return _MODEL, _TOKENIZER
+
+    # Lazy import heavy ML deps so API boot is not blocked unless generation is used.
+    try:
+        import torch
+        from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+    except Exception as exc:
+        raise RuntimeError(
+            "Missing optional ML dependencies. Install backend requirements to use LLM generation."
+        ) from exc
 
     model_name = settings.FLAN_MODEL_NAME
     device = torch.device("cuda" if settings.FLAN_USE_CUDA and torch.cuda.is_available() else "cpu")
