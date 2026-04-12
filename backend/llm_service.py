@@ -1,6 +1,6 @@
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
-from config import settings
+from .config import settings
 from typing import Optional
 
 _MODEL = None
@@ -13,11 +13,29 @@ def _load_model():
         return _MODEL, _TOKENIZER
 
     model_name = settings.FLAN_MODEL_NAME
-    device = torch.device("cuda" if settings.FLAN_USE_CUDA and torch.cuda.is_available() else "cpu")
+    use_cuda = settings.FLAN_USE_CUDA and torch.cuda.is_available()
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-    model = model.to(device)
+    tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
+
+    # Try to load in an efficient way if CUDA is available
+    try:
+        if use_cuda:
+            model = AutoModelForSeq2SeqLM.from_pretrained(
+                model_name,
+                device_map="auto",
+                torch_dtype=torch.float16,
+                low_cpu_mem_usage=True,
+            )
+        else:
+            model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    except Exception:
+        # Fallback to a safer CPU load
+        model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+
+    # If device_map wasn't used, move to device
+    if not use_cuda:
+        device = torch.device("cpu")
+        model = model.to(device)
 
     _MODEL = model
     _TOKENIZER = tokenizer
@@ -39,11 +57,12 @@ def generate_recipe(
     device = next(model.parameters()).device
 
     gen_kwargs = {
-        "max_length": max_length or settings.FLAN_MAX_TOKENS,
+        "max_new_tokens": max_length or settings.FLAN_MAX_TOKENS,
         "temperature": float(settings.FLAN_TEMPERATURE),
         "do_sample": True,
         "top_p": 0.95,
         "num_return_sequences": 1,
+        "pad_token_id": tokenizer.pad_token_id or tokenizer.eos_token_id,
     }
 
     # include retrieval context if provided
@@ -51,7 +70,22 @@ def generate_recipe(
         context_text = "\n\nContext recipes:\n" + "\n---\n".join(context_docs[:5])
         prompt = context_text + "\n\n" + prompt
 
-    inputs = tokenizer(prompt, return_tensors="pt", truncation=True).to(device)
+    # tokenize with padding/truncation and move to the model device
+    inputs = tokenizer(
+        prompt,
+        return_tensors="pt",
+        truncation=True,
+        padding=True,
+        max_length=settings.FLAN_MAX_TOKENS,
+    )
+
+    # move tensors to model device if possible
+    try:
+        device = next(model.parameters()).device
+        inputs = {k: v.to(device) for k, v in inputs.items()}
+    except Exception:
+        pass
+
     with torch.no_grad():
         output_ids = model.generate(**inputs, **gen_kwargs)
 

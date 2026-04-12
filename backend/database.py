@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from config import settings
+from .config import settings
 
 # SQLite requires check_same_thread=False; PostgreSQL URLs need no extra args
 _connect_args = {"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {}

@@ -1,12 +1,18 @@
-from redis import Redis
-from rq import Queue, Job
-from config import settings
-from rag_service import build_index_from_recipes, save_index
-from database import SessionLocal
-from models import Recipe
+from .config import settings
+from .rag_service import build_index_from_recipes, save_index
+from .database import SessionLocal
+from .models import Recipe
 
-redis_conn = Redis.from_url(settings.REDIS_URL)
-queue = Queue("default", connection=redis_conn)
+
+def _get_queue():
+    """Lazily create rq Queue to avoid import-time issues on Windows."""
+    try:
+        from redis import Redis
+        from rq import Queue
+    except Exception:
+        return None
+    conn = Redis.from_url(settings.REDIS_URL)
+    return Queue("default", connection=conn)
 
 
 def _reindex_job():
@@ -26,13 +32,19 @@ def _reindex_job():
 
 
 def enqueue_reindex():
-    job = queue.enqueue(_reindex_job)
+    q = _get_queue()
+    if q is None:
+        raise RuntimeError("RQ or Redis not available in this environment")
+    job = q.enqueue(_reindex_job)
     return job.get_id()
 
 
 def get_job_status(job_id: str) -> dict:
     try:
-        job = Job.fetch(job_id, connection=redis_conn)
+        from rq import Job
+        from redis import Redis
+        conn = Redis.from_url(settings.REDIS_URL)
+        job = Job.fetch(job_id, connection=conn)
     except Exception:
         return {"status": "not_found"}
 

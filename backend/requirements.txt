@@ -20,3 +20,5 @@ faiss-cpu>=1.7.4
 numpy>=1.25.0
 redis>=4.6.0
 rq>=1.10.0
+python-dotenv>=1.0.0
+google-cloud-vision>=3.5.0

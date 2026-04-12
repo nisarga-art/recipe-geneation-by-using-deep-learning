@@ -2,12 +2,12 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional
 import requests
-from database import get_db
-from models import Recipe
-from schemas import RecipeOut
-from clarifai_service import search_concepts_for_text
-from rag_service import build_index_from_recipes, save_index
-from tasks import enqueue_reindex, get_job_status
+from ..database import get_db
+from ..models import Recipe
+from ..schemas import RecipeOut
+from ..clarifai_service import search_concepts_for_text
+from ..rag_service import build_index_from_recipes, save_index
+from ..tasks import enqueue_reindex, get_job_status
 
 router = APIRouter(prefix="/recipes", tags=["Recipes"])
 VIRTUAL_RECIPES_CACHE: dict[int, RecipeOut] = {}
@@ -141,9 +141,15 @@ def search_recipes(
     if difficulty:
         q = q.filter(Recipe.difficulty.ilike(f"%{difficulty}%"))
 
-    local_results = q.all()
-    if local_results:
-        return local_results
+        # First try local DB; if DB unavailable, fall back to external/synthetic results
+        try:
+            local_results = q.all()
+        except Exception as e:
+            print(f"DB query failed in search_recipes: {e}")
+            local_results = []
+
+        if local_results:
+            return local_results
 
     # Fallback to Clarifai text search if configured
     try:
@@ -330,6 +336,15 @@ def get_recipe_by_id(recipe_id: int, db: Session = Depends(get_db)):
         if recipe:
             return recipe
         raise HTTPException(status_code=404, detail="Recipe not found")
+            try:
+                recipe = db.query(Recipe).filter(Recipe.id == recipe_id).first()
+            except Exception as e:
+                print(f"DB query failed in get_recipe_by_id: {e}")
+                recipe = None
+
+            if recipe:
+                return recipe
+            raise HTTPException(status_code=404, detail="Recipe not found")
 
     cached = VIRTUAL_RECIPES_CACHE.get(recipe_id)
     if cached:
@@ -389,7 +404,11 @@ def get_all_recipes(
         search = search.strip().lower()
         query = query.filter(Recipe.title.ilike(f"%{search}%"))
 
-    local_results = query.all()
+        try:
+            local_results = query.all()
+        except Exception as e:
+            print(f"DB query failed in get_all_recipes: {e}")
+            local_results = []
 
     if search:
         # Always also fetch from TheMealDB when searching

@@ -6,9 +6,9 @@ import requests
 from fastapi import APIRouter, Depends, HTTPException
 from difflib import get_close_matches
 from sqlalchemy.orm import Session
-from database import get_db
-from models import Recipe
-from schemas import (
+from ..database import get_db
+from ..models import Recipe
+from ..schemas import (
     HealthPlanRequest,
     HealthPlanResponse,
     FoodRecommendation,
