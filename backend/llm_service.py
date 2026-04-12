@@ -1,19 +1,33 @@
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-import torch
 from .config import settings
 from typing import Optional
 
+# Defer heavy ML imports so module import doesn't fail when optional
+# dependencies are not installed (frontend-only development).
 _MODEL = None
 _TOKENIZER = None
 
+
+def _import_transformers_and_torch():
+    try:
+        import torch
+        from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+        return AutoTokenizer, AutoModelForSeq2SeqLM, torch
+    except Exception as e:
+        raise RuntimeError(
+            "Missing ML dependencies (transformers/torch). Install 'pip install -r requirements.txt' "
+            "or remove ML routes for frontend-only development."
+        ) from e
+from typing import Optional
 
 def _load_model():
     global _MODEL, _TOKENIZER
     if _MODEL is not None and _TOKENIZER is not None:
         return _MODEL, _TOKENIZER
 
+    AutoTokenizer, AutoModelForSeq2SeqLM, torch = _import_transformers_and_torch()
+
     model_name = settings.FLAN_MODEL_NAME
-    use_cuda = settings.FLAN_USE_CUDA and torch.cuda.is_available()
+    use_cuda = getattr(settings, "FLAN_USE_CUDA", False) and torch.cuda.is_available()
 
     tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
 

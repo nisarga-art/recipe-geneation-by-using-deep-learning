@@ -1,8 +1,52 @@
-from sentence_transformers import SentenceTransformer
-import numpy as np
-import faiss
 import json
 from typing import List, Dict, Optional
+
+# Lazy import helpers for optional heavy dependencies
+def _ensure_sentence_transformer():
+    try:
+        from sentence_transformers import SentenceTransformer
+
+        return SentenceTransformer
+    except Exception as e:
+        raise RuntimeError("Missing 'sentence-transformers' package. Install requirements to enable RAG features.") from e
+
+
+def _ensure_faiss():
+    try:
+        import faiss
+
+        return faiss
+    except Exception as e:
+        raise RuntimeError("Missing 'faiss' package. Install requirements to enable RAG features.") from e
+
+
+def _ensure_numpy():
+    try:
+        import numpy as np
+
+        return np
+    except Exception as e:
+        raise RuntimeError("Missing 'numpy' package. Install requirements to enable RAG features.") from e
+
+
+def _ensure_requests():
+    try:
+        import requests
+        from io import BytesIO
+
+        return requests, BytesIO
+    except Exception as e:
+        raise RuntimeError("Missing 'requests' package. Install requirements to enable image downloads.") from e
+
+
+def _ensure_pil():
+    try:
+        from PIL import Image
+
+        return Image
+    except Exception as e:
+        raise RuntimeError("Missing 'Pillow' package. Install requirements to enable image processing.") from e
+
 
 _EMBED_MODEL = None
 _INDEX = None
@@ -11,6 +55,7 @@ _METADATA: List[Dict] = []
 
 def _load_embed_model(model_name: str = "all-MiniLM-L6-v2"):
     global _EMBED_MODEL
+    SentenceTransformer = _ensure_sentence_transformer()
     if _EMBED_MODEL is None:
         _EMBED_MODEL = SentenceTransformer(model_name)
     return _EMBED_MODEL
@@ -61,6 +106,8 @@ def _load_image_model(model_name: str = "clip-ViT-B-32"):
 
 def _download_image(url: str) -> Optional[Image.Image]:
     try:
+        requests, BytesIO = _ensure_requests()
+        Image = _ensure_pil()
         resp = requests.get(url, timeout=6)
         resp.raise_for_status()
         return Image.open(BytesIO(resp.content)).convert("RGB")
@@ -99,6 +146,8 @@ def build_index_from_recipes(recipes: List[Dict], text_model_name: str = "all-Mi
         tmeta.append({"id": r.get("id"), "title": r.get("title"), "source": r})
 
     if docs:
+        np = _ensure_numpy()
+        faiss = _ensure_faiss()
         t_emb = text_model.encode(docs, convert_to_numpy=True, show_progress_bar=False)
         dim = t_emb.shape[1]
         text_index = faiss.IndexFlatIP(dim)
@@ -128,6 +177,8 @@ def build_index_from_recipes(recipes: List[Dict], text_model_name: str = "all-Mi
             continue
 
     if img_embs:
+        np = _ensure_numpy()
+        faiss = _ensure_faiss()
         img_embs = np.vstack(img_embs)
         dim_i = img_embs.shape[1]
         img_index = faiss.IndexFlatIP(dim_i)
@@ -141,11 +192,13 @@ def save_index(index_path: str, meta_path: str, img_index_path: Optional[str] = 
     global _TEXT_INDEX, _TEXT_METADATA, _IMG_INDEX, _IMG_METADATA
     if _TEXT_INDEX is None:
         raise RuntimeError("Text index not built")
+    faiss = _ensure_faiss()
     faiss.write_index(_TEXT_INDEX, index_path)
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(_TEXT_METADATA, f, ensure_ascii=False)
 
     if _IMG_INDEX is not None and img_index_path and img_meta_path:
+        faiss = _ensure_faiss()
         faiss.write_index(_IMG_INDEX, img_index_path)
         with open(img_meta_path, "w", encoding="utf-8") as f:
             json.dump(_IMG_METADATA, f, ensure_ascii=False)
@@ -154,12 +207,14 @@ def save_index(index_path: str, meta_path: str, img_index_path: Optional[str] = 
 def load_index(index_path: str, meta_path: str, img_index_path: Optional[str] = None, img_meta_path: Optional[str] = None, text_model_name: str = "all-MiniLM-L6-v2", img_model_name: str = "clip-ViT-B-32") -> None:
     global _TEXT_INDEX, _TEXT_METADATA, _IMG_INDEX, _IMG_METADATA
     _load_text_model(text_model_name)
+    faiss = _ensure_faiss()
     _TEXT_INDEX = faiss.read_index(index_path)
     with open(meta_path, "r", encoding="utf-8") as f:
         _TEXT_METADATA = json.load(f)
 
     if img_index_path and img_meta_path:
         _load_image_model(img_model_name)
+        faiss = _ensure_faiss()
         _IMG_INDEX = faiss.read_index(img_index_path)
         with open(img_meta_path, "r", encoding="utf-8") as f:
             _IMG_METADATA = json.load(f)
@@ -176,6 +231,8 @@ def search(query: str, top_k: int = 5, image_bytes: Optional[bytes] = None, imag
 
     text_model = _load_text_model()
     q_emb = text_model.encode([query], convert_to_numpy=True)
+    faiss = _ensure_faiss()
+    np = _ensure_numpy()
     faiss.normalize_L2(q_emb)
     D_t, I_t = _TEXT_INDEX.search(q_emb, top_k)
 
@@ -191,6 +248,8 @@ def search(query: str, top_k: int = 5, image_bytes: Optional[bytes] = None, imag
     if image_bytes and _IMG_INDEX is not None:
         img_model = _load_image_model()
         try:
+            requests, BytesIO = _ensure_requests()
+            Image = _ensure_pil()
             img = Image.open(BytesIO(image_bytes)).convert("RGB")
             img_emb = img_model.encode(img, convert_to_numpy=True)
         except Exception:
