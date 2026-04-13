@@ -7,6 +7,7 @@ import RecipesList from "./pages/RecipesList";
 import Menus from "./pages/Menus";
 import HealthGuide from "./pages/HealthGuide";
 import NutrientDetail from "./pages/NutrientDetail";
+import GenerateRecipe from "./pages/GenerateRecipe";
 
 function App() {
   return (
@@ -25,6 +26,8 @@ function App() {
       <Route path="/menus" element={<Menus />} />
 
       <Route path="/health-guide" element={<HealthGuide />} />
+
+      <Route path="/generate-recipe" element={<GenerateRecipe />} />
 
       <Route path="/nutrient/:slug" element={<NutrientDetail />} />
 

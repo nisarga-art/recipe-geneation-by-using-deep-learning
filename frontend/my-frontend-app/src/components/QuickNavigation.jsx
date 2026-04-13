@@ -1,4 +1,4 @@
-function QuickNavigation({ onBrowse, onMenus }) {
+function QuickNavigation({ onBrowse, onMenus, onGenerate }) {
 
 return(
 
@@ -16,8 +16,8 @@ Browse Recipes
 View Menus
 </button>
 
-<button className="btn blue">
-Health Guide
+<button className="btn blue" onClick={onGenerate}>
+Generate Recipe
 </button>
 
 <button className="btn purple">

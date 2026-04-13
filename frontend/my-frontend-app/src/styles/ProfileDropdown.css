@@ -6,29 +6,32 @@
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: #fff4ed;
+  background: linear-gradient(135deg, rgba(255,106,0,0.15) 0%, rgba(255,140,0,0.1) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.15s;
-  border: 2px solid transparent;
+  transition: all 0.3s ease;
+  border: 2px solid rgba(255,106,0,0.2);
 }
 
 .pd-avatar:hover,
 .pd-avatar.open {
-  background: #ffe0cc;
+  background: linear-gradient(135deg, #ff6a00 0%, #ff8c00 100%);
   border-color: #ff6a00;
+  color: white;
 }
 
 .pd-dropdown {
   position: absolute;
   right: 0;
   top: calc(100% + 10px);
-  background: #fff;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,106,0,0.1);
   border-radius: 14px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.13);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.12);
   min-width: 230px;
   z-index: 999;
   overflow: hidden;
@@ -81,5 +84,5 @@
 }
 
 .pd-signout:hover {
-  background: #fff5f5;
+  background: linear-gradient(135deg, rgba(239,68,68,0.08) 0%, rgba(239,68,68,0.04) 100%);
 }

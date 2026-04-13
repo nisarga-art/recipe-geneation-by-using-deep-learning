@@ -1,7 +1,7 @@
 /* ===== PAGE ===== */
 .nd-page {
   min-height: 100vh;
-  background: #f7f7fb;
+  background: linear-gradient(135deg, #f8f9fc 0%, #f3f4f8 100%);
   font-family: 'Segoe UI', sans-serif;
 }
 
@@ -12,8 +12,9 @@
   gap: 32px;
   padding: 0 32px;
   height: 64px;
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  background: linear-gradient(135deg, #ffffff 0%, #f9f9ff 100%);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -112,13 +113,15 @@
 
 /* ===== HEADER CARD ===== */
 .nd-header-card {
-  background: #fff;
+  background: rgba(255,255,255,0.84);
+  backdrop-filter: blur(10px);
   border-radius: 16px;
   padding: 28px 28px;
   display: flex;
   gap: 20px;
   align-items: flex-start;
-  border: 1px solid #f0f0f0;
+  border: 1px solid rgba(255,106,0,0.12);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
 }
 
 .nd-header-emoji {
@@ -148,10 +151,10 @@
 
 /* ===== DAILY REQUIREMENT ===== */
 .nd-daily-req {
-  background: #fff8f0;
+  background: linear-gradient(135deg, rgba(255,106,0,0.1) 0%, rgba(255,140,0,0.04) 100%);
   border-radius: 14px;
   padding: 20px 24px;
-  border: 1px solid #ffe4c4;
+  border: 1px solid rgba(255,106,0,0.2);
 }
 
 .nd-dr-title {
@@ -281,10 +284,12 @@
 .nd-sources-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  background: #fff;
+  background: rgba(255,255,255,0.84);
+  backdrop-filter: blur(10px);
   border-radius: 14px;
   overflow: hidden;
-  border: 1px solid #ebebeb;
+  border: 1px solid rgba(255,106,0,0.12);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
 }
 
 .nd-source-item {
@@ -298,7 +303,7 @@
 }
 
 .nd-source-item:hover {
-  background: #fafafa;
+  background: rgba(255,106,0,0.06);
 }
 
 .nd-source-item:nth-child(odd) {

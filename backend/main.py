@@ -38,10 +38,9 @@ async def catch_exceptions_middleware(request: Request, call_next):
 # CORS — allow the React frontend dev server
 app.add_middleware(
     CORSMiddleware,
-    # Allow both localhost and 127.0.0.1 variants used by dev servers
-    # For development allow any origin to avoid CORS issues with local frontends.
-    # In production restrict this to your deployed frontend origins.
-    allow_origins=["*"],
+    # Allow common dev origins and any localhost/127.0.0.1 port (e.g., Vite fallback port 5174)
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
