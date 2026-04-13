@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # Optional heavy dependencies (safe lazy imports)
 try:
     from sentence_transformers import SentenceTransformer

@@ -332,19 +332,15 @@ def _top_up_cuisine_results(cuisine: str, needed: int, existing_titles: set[str]
 @router.get("/{recipe_id}", response_model=RecipeOut)
 def get_recipe_by_id(recipe_id: int, db: Session = Depends(get_db)):
     if recipe_id >= 0:
-        recipe = db.query(Recipe).filter(Recipe.id == recipe_id).first()
+        try:
+            recipe = db.query(Recipe).filter(Recipe.id == recipe_id).first()
+        except Exception as e:
+            print(f"DB query failed in get_recipe_by_id: {e}")
+            recipe = None
+
         if recipe:
             return recipe
         raise HTTPException(status_code=404, detail="Recipe not found")
-            try:
-                recipe = db.query(Recipe).filter(Recipe.id == recipe_id).first()
-            except Exception as e:
-                print(f"DB query failed in get_recipe_by_id: {e}")
-                recipe = None
-
-            if recipe:
-                return recipe
-            raise HTTPException(status_code=404, detail="Recipe not found")
 
     cached = VIRTUAL_RECIPES_CACHE.get(recipe_id)
     if cached:
@@ -404,11 +400,12 @@ def get_all_recipes(
         search = search.strip().lower()
         query = query.filter(Recipe.title.ilike(f"%{search}%"))
 
-        try:
-            local_results = query.all()
-        except Exception as e:
-            print(f"DB query failed in get_all_recipes: {e}")
-            local_results = []
+    # Execute DB query once and ensure `local_results` is always defined
+    try:
+        local_results = query.all()
+    except Exception as e:
+        print(f"DB query failed in get_all_recipes: {e}")
+        local_results = []
 
     if search:
         # Always also fetch from TheMealDB when searching

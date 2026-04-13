@@ -37,7 +37,9 @@ class Settings(BaseSettings):
     MATCH_SCORE_THRESHOLD: float = 3.0
 
     class Config:
-        env_file = ".env"
+        # Ensure we load the backend-specific env file even when started
+        # from the repository root (scripts use repo root as CWD).
+        env_file = "backend/.env"
 
 
 settings = Settings()
