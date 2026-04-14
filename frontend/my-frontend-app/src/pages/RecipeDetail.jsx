@@ -181,12 +181,99 @@ function RecipeDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const listContext = location.state?.listContext || null;
+  const editRequested = new URLSearchParams(location.search).get("edit") === "1";
   const [recipe, setRecipe] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [buyItem, setBuyItem] = useState(null);
   const [orderOpen, setOrderOpen] = useState(false);
   const [localRecipe, setLocalRecipe] = useState(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [saveCopyBusy, setSaveCopyBusy] = useState(false);
+  const [regenerateBusy, setRegenerateBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [editForm, setEditForm] = useState(null);
+
+  const splitLines = (value) =>
+    String(value || "")
+      .split(/[\n,;]+/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+  const formatLines = (value) =>
+    Array.isArray(value) ? value.filter(Boolean).join("\n") : "";
+
+  const buildEditForm = (data) => ({
+    title: data.title || "",
+    cuisine: data.cuisine || "",
+    diet: data.diet || "",
+    time: data.time || "",
+    calories: data.calories ?? "",
+    difficulty: data.difficulty || "",
+    meal: data.meal || "",
+    image: data.image || "",
+    cultural: data.cultural || "",
+    pantry_match: data.pantryMatch ?? data.pantry_match ?? "",
+    ingredients_available: formatLines(data.ingredients?.available),
+    ingredients_missing: formatLines(data.ingredients?.missing),
+    nutrition_protein: data.nutrition?.protein ?? "",
+    nutrition_carbs: data.nutrition?.carbs ?? "",
+    nutrition_fat: data.nutrition?.fat ?? "",
+    nutrition_fiber: data.nutrition?.fiber ?? "",
+    steps: formatLines(data.steps),
+    health_benefits: formatLines(data.healthBenefits || data.health_benefits),
+    similar_dishes: formatLines(data.similarDishes || data.similar_dishes),
+    food_labels: formatLines(data.food_labels),
+  });
+
+  const buildRecipePayload = (data) => ({
+    title: data.title,
+    cuisine: data.cuisine || null,
+    diet: data.diet || null,
+    time: data.time || null,
+    calories: data.calories ?? null,
+    difficulty: data.difficulty || null,
+    meal: data.meal || null,
+    image: data.image || null,
+    pantry_match: data.pantry_match ?? data.pantryMatch ?? null,
+    cultural: data.cultural || null,
+    ingredients: data.ingredients,
+    nutrition: data.nutrition,
+    health_benefits: data.health_benefits || data.healthBenefits || null,
+    steps: data.steps,
+    similar_dishes: data.similar_dishes || data.similarDishes || null,
+    food_labels: data.food_labels || null,
+  });
+
+  const buildPayloadFromEditForm = () => ({
+    title: editForm.title?.trim() || current.title,
+    cuisine: editForm.cuisine?.trim() || null,
+    diet: editForm.diet?.trim() || null,
+    time: editForm.time?.trim() || null,
+    calories: editForm.calories === "" ? null : Number(editForm.calories),
+    difficulty: editForm.difficulty?.trim() || null,
+    meal: editForm.meal?.trim() || null,
+    image: editForm.image?.trim() || null,
+    pantry_match: editForm.pantry_match === "" ? null : Number(editForm.pantry_match),
+    cultural: editForm.cultural?.trim() || null,
+    ingredients: {
+      available: splitLines(editForm.ingredients_available),
+      missing: splitLines(editForm.ingredients_missing),
+    },
+    nutrition: {
+      protein: Number(editForm.nutrition_protein || 0),
+      carbs: Number(editForm.nutrition_carbs || 0),
+      fat: Number(editForm.nutrition_fat || 0),
+      fiber: Number(editForm.nutrition_fiber || 0),
+    },
+    health_benefits: splitLines(editForm.health_benefits),
+    steps: splitLines(editForm.steps),
+    similar_dishes: splitLines(editForm.similar_dishes),
+    food_labels: splitLines(editForm.food_labels),
+  });
 
   const toRecipeView = (data) => {
     const rawIngredients = data.ingredients;
@@ -284,7 +371,15 @@ function RecipeDetail() {
     };
 
     fetchRecipe();
-  }, [id, location.state]);
+  }, [id, location.state, location.search]);
+
+  useEffect(() => {
+    if (recipe && editRequested && !editOpen) {
+      setEditForm(buildEditForm(recipe));
+      setEditOpen(true);
+      setEditError("");
+    }
+  }, [recipe, editRequested, editOpen]);
 
   // ── Voice Assistant ──────────────────────────────────────
   // currentStep: -1 = idle, -2 = intro, 0+ = step index
@@ -406,6 +501,173 @@ function RecipeDetail() {
 
   const current = localRecipe || recipe;
 
+  const currentList = listContext?.recipes || [];
+  const currentIndex = typeof listContext?.currentIndex === "number" ? listContext.currentIndex : -1;
+
+  const goToRecipeAtIndex = (nextIndex) => {
+    const nextRecipe = currentList[nextIndex];
+    if (!nextRecipe) return;
+
+    navigate(`/recipe/${nextRecipe.id}`, {
+      state: {
+        recipe: nextRecipe,
+        listContext: {
+          ...listContext,
+          currentIndex: nextIndex,
+        },
+      },
+    });
+  };
+
+  const openEditor = () => {
+    if (!current) return;
+    setEditForm(buildEditForm(current));
+    setEditError("");
+    setEditOpen(true);
+  };
+
+  const closeEditor = () => {
+    setEditOpen(false);
+    setEditError("");
+  };
+
+  const saveCurrentRecipe = async () => {
+    if (!current || !editForm) return;
+
+    setEditSaving(true);
+    setEditError("");
+    try {
+      const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+      const payload = buildPayloadFromEditForm();
+      const isExistingRecipe = Number(current.id) >= 0;
+      const response = await fetch(
+        isExistingRecipe ? `${API_BASE.replace(/\/$/, "")}/recipes/${current.id}` : `${API_BASE.replace(/\/$/, "")}/recipes/`,
+        {
+          method: isExistingRecipe ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`Save failed with ${response.status}`);
+      }
+
+      const saved = await response.json();
+      toRecipeView(saved);
+      setEditOpen(false);
+      if (!isExistingRecipe) {
+        navigate(`/recipe/${saved.id}`, { replace: true, state: { recipe: saved, listContext } });
+      }
+    } catch (error) {
+      setEditError(error.message || "Unable to save recipe.");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const saveRecipeCopy = async () => {
+    if (!current) return;
+
+    setSaveCopyBusy(true);
+    setEditError("");
+    try {
+      const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+      const response = await fetch(`${API_BASE.replace(/\/$/, "")}/recipes/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildRecipePayload(current)),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Save copy failed with ${response.status}`);
+      }
+
+      const saved = await response.json();
+      navigate(`/recipe/${saved.id}`, { state: { recipe: saved } });
+    } catch (error) {
+      setEditError(error.message || "Unable to save recipe copy.");
+    } finally {
+      setSaveCopyBusy(false);
+    }
+  };
+
+  const regenerateRecipe = async () => {
+    if (!current) return;
+
+    setRegenerateBusy(true);
+    setEditError("");
+    try {
+      const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+      if (Number(current.id) >= 0) {
+        const response = await fetch(`${API_BASE.replace(/\/$/, "")}/recipes/${current.id}/regenerate`, { method: "POST" });
+        if (!response.ok) {
+          throw new Error(`Regenerate failed with ${response.status}`);
+        }
+
+        const regenerated = await response.json();
+        navigate(`/recipe/${regenerated.id}`, { state: { recipe: regenerated, listContext } });
+        return;
+      }
+
+      const regeneratedDraft = {
+        ...current,
+        title: `${current.title} (Regenerated)`,
+        time: current.time || "35 minutes",
+        steps: Array.isArray(current.steps) && current.steps.length > 0
+          ? [...current.steps, "Finish with a final seasoning pass before serving."]
+          : ["Prep the ingredients.", "Cook the recipe.", "Finish and serve."],
+      };
+
+      const response = await fetch(`${API_BASE.replace(/\/$/, "")}/recipes/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildRecipePayload(regeneratedDraft)),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Regenerate failed with ${response.status}`);
+      }
+
+      const regenerated = await response.json();
+      navigate(`/recipe/${regenerated.id}`, { state: { recipe: regenerated } });
+    } catch (error) {
+      setEditError(error.message || "Unable to regenerate recipe.");
+    } finally {
+      setRegenerateBusy(false);
+    }
+  };
+
+  const deleteCurrentRecipe = async () => {
+    if (!current || Number(current.id) < 0) {
+      setEditError("External recipes cannot be deleted.");
+      return;
+    }
+
+    if (!window.confirm(`Delete ${current.title}?`)) {
+      return;
+    }
+
+    setDeleteBusy(true);
+    setEditError("");
+    try {
+      const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+      const response = await fetch(`${API_BASE.replace(/\/$/, "")}/recipes/${current.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Delete failed with ${response.status}`);
+      }
+
+      navigate("/recipes");
+    } catch (error) {
+      setEditError(error.message || "Unable to delete recipe.");
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
   const difficultyColor = {
     Easy: "#22c55e",
     Medium: "#f97316",
@@ -500,8 +762,139 @@ function RecipeDetail() {
               🍽️ Order on Zomato
             </button>
           </div>
+
+          <div className="rd-action-row">
+            {currentIndex > 0 && (
+              <button className="rd-action-btn" onClick={() => goToRecipeAtIndex(currentIndex - 1)}>
+                ← Previous
+              </button>
+            )}
+            {currentIndex >= 0 && currentIndex < currentList.length - 1 && (
+              <button className="rd-action-btn" onClick={() => goToRecipeAtIndex(currentIndex + 1)}>
+                Next →
+              </button>
+            )}
+            <button className="rd-action-btn" onClick={saveRecipeCopy} disabled={saveCopyBusy}>
+              {saveCopyBusy ? "Saving..." : "Save Copy"}
+            </button>
+            <button className="rd-action-btn" onClick={openEditor}>
+              Edit
+            </button>
+            <button className="rd-action-btn" onClick={regenerateRecipe} disabled={regenerateBusy}>
+              {regenerateBusy ? "Regenerating..." : "Regenerate"}
+            </button>
+            {current.id >= 0 && (
+              <button className="rd-action-btn danger" onClick={deleteCurrentRecipe} disabled={deleteBusy}>
+                {deleteBusy ? "Deleting..." : "Delete"}
+              </button>
+            )}
+          </div>
         </div>
       </div>
+
+      {editOpen && editForm && (
+        <div className="rd-body" style={{ paddingTop: 0 }}>
+          <div className="rd-card" style={{ width: "100%" }}>
+            <div className="rd-edit-header">
+              <div>
+                <h2 className="rd-section-title" style={{ marginBottom: 6 }}>Edit Recipe</h2>
+                <p style={{ margin: 0, color: "#6b7280" }}>Update the stored recipe fields and save changes back to the database.</p>
+              </div>
+              <div className="rd-edit-actions">
+                <button className="rd-action-btn" onClick={closeEditor}>Close</button>
+                <button className="rd-action-btn primary" onClick={saveCurrentRecipe} disabled={editSaving}>
+                  {editSaving ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </div>
+
+            {editError && <div className="rd-edit-error">{editError}</div>}
+
+            <div className="rd-edit-grid">
+              <label>
+                <span>Title</span>
+                <input value={editForm.title} onChange={(e) => setEditForm((prev) => ({ ...prev, title: e.target.value }))} />
+              </label>
+              <label>
+                <span>Cuisine</span>
+                <input value={editForm.cuisine} onChange={(e) => setEditForm((prev) => ({ ...prev, cuisine: e.target.value }))} />
+              </label>
+              <label>
+                <span>Diet</span>
+                <input value={editForm.diet} onChange={(e) => setEditForm((prev) => ({ ...prev, diet: e.target.value }))} />
+              </label>
+              <label>
+                <span>Meal</span>
+                <input value={editForm.meal} onChange={(e) => setEditForm((prev) => ({ ...prev, meal: e.target.value }))} />
+              </label>
+              <label>
+                <span>Time</span>
+                <input value={editForm.time} onChange={(e) => setEditForm((prev) => ({ ...prev, time: e.target.value }))} />
+              </label>
+              <label>
+                <span>Calories</span>
+                <input type="number" value={editForm.calories} onChange={(e) => setEditForm((prev) => ({ ...prev, calories: e.target.value }))} />
+              </label>
+              <label>
+                <span>Difficulty</span>
+                <input value={editForm.difficulty} onChange={(e) => setEditForm((prev) => ({ ...prev, difficulty: e.target.value }))} />
+              </label>
+              <label>
+                <span>Pantry Match</span>
+                <input type="number" value={editForm.pantry_match} onChange={(e) => setEditForm((prev) => ({ ...prev, pantry_match: e.target.value }))} />
+              </label>
+              <label className="rd-edit-wide">
+                <span>Image URL</span>
+                <input value={editForm.image} onChange={(e) => setEditForm((prev) => ({ ...prev, image: e.target.value }))} />
+              </label>
+              <label className="rd-edit-wide">
+                <span>Cultural Note</span>
+                <input value={editForm.cultural} onChange={(e) => setEditForm((prev) => ({ ...prev, cultural: e.target.value }))} />
+              </label>
+              <label>
+                <span>Protein</span>
+                <input type="number" value={editForm.nutrition_protein} onChange={(e) => setEditForm((prev) => ({ ...prev, nutrition_protein: e.target.value }))} />
+              </label>
+              <label>
+                <span>Carbs</span>
+                <input type="number" value={editForm.nutrition_carbs} onChange={(e) => setEditForm((prev) => ({ ...prev, nutrition_carbs: e.target.value }))} />
+              </label>
+              <label>
+                <span>Fat</span>
+                <input type="number" value={editForm.nutrition_fat} onChange={(e) => setEditForm((prev) => ({ ...prev, nutrition_fat: e.target.value }))} />
+              </label>
+              <label>
+                <span>Fiber</span>
+                <input type="number" value={editForm.nutrition_fiber} onChange={(e) => setEditForm((prev) => ({ ...prev, nutrition_fiber: e.target.value }))} />
+              </label>
+              <label className="rd-edit-wide">
+                <span>Available Ingredients</span>
+                <textarea rows="4" value={editForm.ingredients_available} onChange={(e) => setEditForm((prev) => ({ ...prev, ingredients_available: e.target.value }))} />
+              </label>
+              <label className="rd-edit-wide">
+                <span>Missing Ingredients</span>
+                <textarea rows="4" value={editForm.ingredients_missing} onChange={(e) => setEditForm((prev) => ({ ...prev, ingredients_missing: e.target.value }))} />
+              </label>
+              <label className="rd-edit-wide">
+                <span>Steps</span>
+                <textarea rows="6" value={editForm.steps} onChange={(e) => setEditForm((prev) => ({ ...prev, steps: e.target.value }))} />
+              </label>
+              <label className="rd-edit-wide">
+                <span>Health Benefits</span>
+                <textarea rows="4" value={editForm.health_benefits} onChange={(e) => setEditForm((prev) => ({ ...prev, health_benefits: e.target.value }))} />
+              </label>
+              <label className="rd-edit-wide">
+                <span>Similar Dishes</span>
+                <textarea rows="3" value={editForm.similar_dishes} onChange={(e) => setEditForm((prev) => ({ ...prev, similar_dishes: e.target.value }))} />
+              </label>
+              <label className="rd-edit-wide">
+                <span>Food Labels</span>
+                <textarea rows="3" value={editForm.food_labels} onChange={(e) => setEditForm((prev) => ({ ...prev, food_labels: e.target.value }))} />
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Body */}
       <div className="rd-body">

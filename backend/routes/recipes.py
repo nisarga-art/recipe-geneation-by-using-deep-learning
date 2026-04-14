@@ -1,13 +1,23 @@
-from fastapi import APIRouter, Depends, Query, HTTPException
+import json
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import Optional
 import requests
+<<<<<<< HEAD
+from database import get_db
+from models import Recipe
+from schemas import RecipeOut, RecipeCreate, RecipeUpdate, RecipeListResponse
+from clarifai_service import search_concepts_for_text
+from rag_service import build_index_from_recipes, save_index
+from tasks import enqueue_reindex, get_job_status
+=======
 from ..database import get_db
 from ..models import Recipe
 from ..schemas import RecipeOut
 from ..clarifai_service import search_concepts_for_text
 from ..rag_service import build_index_from_recipes, save_index
 from ..tasks import enqueue_reindex, get_job_status
+>>>>>>> 0ba329a9dcb010f5d8639fc47b8551cd3e264e61
 
 router = APIRouter(prefix="/recipes", tags=["Recipes"])
 VIRTUAL_RECIPES_CACHE: dict[int, RecipeOut] = {}
@@ -78,6 +88,105 @@ def _pick_image(keyword: str | None) -> str:
         if key in k:
             return url
     return DEFAULT_IMAGE
+
+
+def _parse_time_minutes(value: str | None) -> int:
+    if not value:
+        return 0
+    digits = "".join(ch for ch in value if ch.isdigit())
+    return int(digits) if digits else 0
+
+
+def _normalize_recipe_payload(payload: RecipeCreate | RecipeUpdate) -> dict:
+    data = payload.model_dump(exclude_unset=True)
+    if "title" in data:
+        data["title"] = (data["title"] or "Untitled Recipe").strip() or "Untitled Recipe"
+    return data
+
+
+def _update_recipe_instance(recipe: Recipe, payload: RecipeCreate | RecipeUpdate) -> Recipe:
+    data = _normalize_recipe_payload(payload)
+    for key, value in data.items():
+        setattr(recipe, key, value)
+    return recipe
+
+
+def _refresh_recipe_index(db: Session) -> None:
+    try:
+        all_recipes = db.query(Recipe).all()
+        recipe_dicts = []
+        for recipe in all_recipes:
+            recipe_dicts.append({
+                "id": recipe.id,
+                "title": recipe.title,
+                "ingredients": recipe.ingredients,
+            })
+        build_index_from_recipes(recipe_dicts)
+        save_index("backend/faiss_index.bin", "backend/faiss_meta.json")
+    except Exception:
+        pass
+
+
+def _sort_recipes(recipes: list[Recipe | RecipeOut], sort_by: str, sort_order: str) -> list:
+    reverse = sort_order.lower() == "desc"
+
+    def key(recipe: Recipe | RecipeOut):
+        if sort_by == "title":
+            return (getattr(recipe, "title", "") or "").lower()
+        if sort_by == "cuisine":
+            return (getattr(recipe, "cuisine", "") or "").lower()
+        if sort_by == "calories":
+            return getattr(recipe, "calories", 0) or 0
+        if sort_by == "time":
+            return _parse_time_minutes(getattr(recipe, "time", None))
+        if sort_by == "pantry_match":
+            return getattr(recipe, "pantry_match", 0) or 0
+        return getattr(recipe, "id", 0) or 0
+
+    return sorted(recipes, key=key, reverse=reverse)
+
+
+def _paginate_recipes(recipes: list, page: int, page_size: int) -> tuple[list, int, int]:
+    safe_page = max(1, page)
+    safe_page_size = max(1, min(page_size, 50))
+    total = len(recipes)
+    total_pages = max(1, (total + safe_page_size - 1) // safe_page_size)
+    start = (safe_page - 1) * safe_page_size
+    end = start + safe_page_size
+    return recipes[start:end], total, total_pages
+
+
+def _build_regenerated_recipe_payload(recipe: Recipe) -> dict:
+    ingredients = recipe.ingredients if isinstance(recipe.ingredients, dict) else {"available": [], "missing": []}
+    nutrition = recipe.nutrition if isinstance(recipe.nutrition, dict) else {}
+    steps = recipe.steps if isinstance(recipe.steps, list) else []
+
+    updated_steps = list(steps) if steps else ["Prepare the ingredients.", "Cook the recipe and finish with seasoning."]
+    if updated_steps:
+        updated_steps[0] = f"Prepare ingredients for the regenerated version of {recipe.title}."
+    updated_steps.append("Taste and adjust seasoning to finish the regenerated variation.")
+
+    return {
+        "title": f"{recipe.title} (Regenerated)",
+        "cuisine": recipe.cuisine,
+        "diet": recipe.diet,
+        "time": recipe.time,
+        "calories": recipe.calories,
+        "difficulty": recipe.difficulty,
+        "meal": recipe.meal,
+        "image": recipe.image,
+        "pantry_match": recipe.pantry_match,
+        "cultural": recipe.cultural,
+        "ingredients": {
+            "available": list(dict.fromkeys((ingredients.get("available") or []) + ["Fresh herbs"])),
+            "missing": ingredients.get("missing") or [],
+        },
+        "nutrition": nutrition,
+        "health_benefits": recipe.health_benefits,
+        "steps": updated_steps,
+        "similar_dishes": recipe.similar_dishes,
+        "food_labels": recipe.food_labels,
+    }
 
 
 def _concepts_to_recipe_results(concepts: list[dict], query: str) -> list[RecipeOut]:
@@ -377,13 +486,17 @@ def get_recipe_by_id(recipe_id: int, db: Session = Depends(get_db)):
     return synthetic
 
 
-@router.get("/", response_model=list[RecipeOut])
+@router.get("/", response_model=RecipeListResponse)
 def get_all_recipes(
     cuisine: Optional[str] = Query(None),
     diet: Optional[str] = Query(None),
     meal: Optional[str] = Query(None),
     difficulty: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(12, ge=1, le=50),
+    sort_by: str = Query("id"),
+    sort_order: str = Query("desc"),
     db: Session = Depends(get_db),
 ):
     query = db.query(Recipe)
@@ -400,22 +513,26 @@ def get_all_recipes(
         search = search.strip().lower()
         query = query.filter(Recipe.title.ilike(f"%{search}%"))
 
+<<<<<<< HEAD
+    results = list(query.all())
+=======
     # Execute DB query once and ensure `local_results` is always defined
     try:
         local_results = query.all()
     except Exception as e:
         print(f"DB query failed in get_all_recipes: {e}")
         local_results = []
+>>>>>>> 0ba329a9dcb010f5d8639fc47b8551cd3e264e61
 
     if search:
         # Always also fetch from TheMealDB when searching
-        external_recipes = []
+        external_recipes: list[RecipeOut] = []
         try:
             url = f"https://www.themealdb.com/api/json/v1/1/search.php?s={search}"
             response = requests.get(url, timeout=5)
             data = response.json()
             meals = data.get("meals", [])
-            local_titles = {r.title.lower() for r in local_results}
+            local_titles = {r.title.lower() for r in results}
             for meal in meals or []:
                 # Avoid duplicates already in local DB
                 if meal.get("strMeal", "").lower() not in local_titles:
@@ -431,20 +548,130 @@ def get_all_recipes(
             print(f"TheMealDB fetch error: {e}")
 
         # Combine local + external results
-        return list(local_results) + external_recipes
+        results.extend(external_recipes)
 
     if cuisine:
         min_per_cuisine = 10
-        combined_results = list(local_results)
-        if len(combined_results) < min_per_cuisine:
-            existing_titles = {r.title.lower() for r in combined_results}
-            needed = min_per_cuisine - len(combined_results)
-            combined_results.extend(_top_up_cuisine_results(cuisine, needed, existing_titles, meal))
-        return combined_results
+        if len(results) < min_per_cuisine:
+            existing_titles = {r.title.lower() for r in results}
+            needed = min_per_cuisine - len(results)
+            results.extend(_top_up_cuisine_results(cuisine, needed, existing_titles, meal))
 
-    # If not searching or cuisine filtering, return local DB results.
-    return local_results
+    sorted_results = _sort_recipes(results, sort_by, sort_order)
+    paginated_results, total, total_pages = _paginate_recipes(sorted_results, page, page_size)
+    return RecipeListResponse(
+        items=paginated_results,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
 
+@router.post("/", response_model=RecipeOut, status_code=status.HTTP_201_CREATED)
+def create_recipe(payload: RecipeCreate, db: Session = Depends(get_db)):
+    recipe = Recipe()
+    _update_recipe_instance(recipe, payload)
+    db.add(recipe)
+    db.commit()
+    db.refresh(recipe)
+    _refresh_recipe_index(db)
+    return recipe
+
+@router.put("/{recipe_id}", response_model=RecipeOut)
+def update_recipe(recipe_id: int, payload: RecipeUpdate, db: Session = Depends(get_db)):
+    if recipe_id < 0:
+        raise HTTPException(status_code=400, detail="Virtual recipes cannot be updated")
+
+    recipe = db.query(Recipe).filter(Recipe.id == recipe_id).first()
+    if not recipe:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+
+    _update_recipe_instance(recipe, payload)
+    db.commit()
+    db.refresh(recipe)
+    _refresh_recipe_index(db)
+    return recipe
+
+@router.delete("/{recipe_id}")
+def delete_recipe(recipe_id: int, db: Session = Depends(get_db)):
+    if recipe_id < 0:
+        raise HTTPException(status_code=400, detail="Virtual recipes cannot be deleted")
+
+    recipe = db.query(Recipe).filter(Recipe.id == recipe_id).first()
+    if not recipe:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+
+    db.delete(recipe)
+    db.commit()
+    _refresh_recipe_index(db)
+    return {"status": "deleted", "id": recipe_id}
+
+@router.post("/{recipe_id}/regenerate", response_model=RecipeOut)
+def regenerate_recipe(recipe_id: int, db: Session = Depends(get_db)):
+    if recipe_id < 0:
+        raise HTTPException(status_code=400, detail="Virtual recipes cannot be regenerated")
+
+    recipe = db.query(Recipe).filter(Recipe.id == recipe_id).first()
+    if not recipe:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+
+    regenerated_data = _build_regenerated_recipe_payload(recipe)
+    try:
+        from llm_service import generate_recipe
+
+        prompt = (
+            "Rewrite the following recipe as a fresh variation. "
+            "Keep the JSON schema consistent and return only valid JSON.\n\n"
+            + json.dumps(
+                {
+                    "title": recipe.title,
+                    "cuisine": recipe.cuisine,
+                    "diet": recipe.diet,
+                    "meal": recipe.meal,
+                    "time": recipe.time,
+                    "calories": recipe.calories,
+                    "difficulty": recipe.difficulty,
+                    "ingredients": recipe.ingredients,
+                    "nutrition": recipe.nutrition,
+                    "steps": recipe.steps,
+                    "cultural": recipe.cultural,
+                },
+                default=str,
+            )
+        )
+        generated = generate_recipe(prompt, enforce_json=True, max_retries=1)
+        parsed = None
+        if isinstance(generated, tuple):
+            _, parsed = generated
+        if isinstance(parsed, dict):
+            regenerated_data.update({
+                "title": (parsed.get("title") or regenerated_data["title"])[:200],
+                "cuisine": parsed.get("cuisine") or regenerated_data["cuisine"],
+                "diet": parsed.get("diet") or regenerated_data["diet"],
+                "time": parsed.get("time") or parsed.get("prep_time") or regenerated_data["time"],
+                "calories": parsed.get("calories") or regenerated_data["calories"],
+                "difficulty": parsed.get("difficulty") or regenerated_data["difficulty"],
+                "meal": parsed.get("meal") or regenerated_data["meal"],
+                "image": parsed.get("image") or regenerated_data["image"],
+                "ingredients": parsed.get("ingredients") or regenerated_data["ingredients"],
+                "nutrition": parsed.get("nutrition") or regenerated_data["nutrition"],
+                "health_benefits": parsed.get("health_benefits") or regenerated_data["health_benefits"],
+                "steps": parsed.get("steps") or regenerated_data["steps"],
+                "similar_dishes": parsed.get("similar_dishes") or regenerated_data["similar_dishes"],
+                "food_labels": parsed.get("food_labels") or regenerated_data["food_labels"],
+            })
+    except Exception:
+        pass
+
+    regenerated = Recipe()
+    _update_recipe_instance(regenerated, RecipeCreate(**regenerated_data))
+    db.add(regenerated)
+    db.commit()
+    db.refresh(regenerated)
+    _refresh_recipe_index(db)
+    return regenerated
 
 @router.post("/reindex")
 def reindex_recipes(db: Session = Depends(get_db)):

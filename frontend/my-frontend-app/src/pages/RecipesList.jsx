@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ProfileDropdown from "../components/ProfileDropdown";
 import allRecipes from "../data/allRecipes";
@@ -47,7 +47,7 @@ const normalizeRecipe = (item) => ({
     ? item.steps
     : [
         "Prep ingredients: chop aromatics, measure spices, ready protein/veg.",
-        "Cook base: heat oil, sauté aromatics, toast spices until fragrant.",
+        "Cook base: heat oil, saute aromatics, toast spices until fragrant.",
         "Build: add mains, simmer/roast until tender and flavors marry.",
         "Finish: adjust seasoning, garnish, and serve warm.",
       ],
@@ -59,6 +59,8 @@ const normalizeRecipe = (item) => ({
     : { protein: 12, carbs: 36, fat: 14, fiber: 5 },
   health_benefits: Array.isArray(item.health_benefits) ? item.health_benefits : [],
   similar_dishes: Array.isArray(item.similar_dishes) ? item.similar_dishes : [],
+  food_labels: Array.isArray(item.food_labels) ? item.food_labels : [],
+  cultural: item.cultural || null,
 });
 
 const applyFilters = (list, searchText, cuisine, diet) => {
@@ -81,6 +83,25 @@ const applyFilters = (list, searchText, cuisine, diet) => {
     .map(normalizeRecipe);
 };
 
+const parseMinutes = (value) => {
+  if (!value) return 0;
+  const digits = String(value).replace(/[^0-9]/g, "");
+  return digits ? Number(digits) : 0;
+};
+
+const sortRecipes = (list, sortBy, sortOrder) => {
+  const sorted = [...list].sort((a, b) => {
+    if (sortBy === "title") return (a.title || "").localeCompare(b.title || "");
+    if (sortBy === "cuisine") return (a.cuisine || "").localeCompare(b.cuisine || "");
+    if (sortBy === "calories") return (Number(a.calories) || 0) - (Number(b.calories) || 0);
+    if (sortBy === "time") return parseMinutes(a.time) - parseMinutes(b.time);
+    if (sortBy === "pantry_match") return (Number(a.pantry_match) || 0) - (Number(b.pantry_match) || 0);
+    return (Number(a.id) || 0) - (Number(b.id) || 0);
+  });
+
+  return sortOrder === "desc" ? sorted.reverse() : sorted;
+};
+
 export default function RecipesList() {
   const navigate = useNavigate();
   const [recipes, setRecipes] = useState([]);
@@ -88,44 +109,72 @@ export default function RecipesList() {
   const [search, setSearch] = useState("");
   const [activeCuisine, setActiveCuisine] = useState("All");
   const [activeDiet, setActiveDiet] = useState("All");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [sortBy, setSortBy] = useState("id");
+  const [sortOrder, setSortOrder] = useState("desc");
+  const [reloadKey, setReloadKey] = useState(0);
+  const [actionError, setActionError] = useState("");
   const [favorites, setFavorites] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("rl_favorites") || "[]"); }
-    catch { return []; }
+    try {
+      return JSON.parse(localStorage.getItem("rl_favorites") || "[]");
+    } catch {
+      return [];
+    }
   });
   const [favOpen, setFavOpen] = useState(false);
   const favRef = useRef(null);
 
   useEffect(() => {
-    const params = new URLSearchParams();
-    if (activeCuisine !== "All") params.append("cuisine", activeCuisine);
-    if (activeDiet !== "All") params.append("diet", activeDiet);
+    setPage(1);
+  }, [search, activeCuisine, activeDiet, pageSize, sortBy, sortOrder]);
 
+  useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
+      setActionError("");
       try {
         const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-        const url = search
-          ? `${API_BASE.replace(/\/$/, "")}/recipes/search?query=${encodeURIComponent(search)}&${params.toString()}`
-          : `${API_BASE.replace(/\/$/, "")}/recipes?${params.toString()}`;
+        const params = new URLSearchParams();
+        if (search.trim()) params.set("search", search.trim());
+        if (activeCuisine !== "All") params.set("cuisine", activeCuisine);
+        if (activeDiet !== "All") params.set("diet", activeDiet);
+        params.set("page", String(page));
+        params.set("page_size", String(pageSize));
+        params.set("sort_by", sortBy);
+        params.set("sort_order", sortOrder);
+
+        const url = `${API_BASE.replace(/\/$/, "")}/recipes/?${params.toString()}`;
         const res = await fetch(url);
+        if (!res.ok) throw new Error(`Request failed with ${res.status}`);
+
         const data = await res.json();
-        const apiList = Array.isArray(data) ? data : [];
+        const apiItems = Array.isArray(data) ? data : data.items || [];
+        const total = Array.isArray(data) ? apiItems.length : data.total ?? apiItems.length;
+        const pages = Array.isArray(data) ? Math.max(1, Math.ceil(apiItems.length / pageSize)) : data.total_pages ?? 1;
 
-        const filteredApi = applyFilters(apiList, search, activeCuisine, activeDiet);
-        const filteredFallback = applyFilters(allRecipes, search, activeCuisine, activeDiet);
-
-        // Prefer live data; if none, fall back to curated local recipes so the grid is never empty.
-        setRecipes(filteredApi.length ? filteredApi : filteredFallback);
+        setRecipes(apiItems.map(normalizeRecipe));
+        setTotalCount(total);
+        setTotalPages(pages);
       } catch (err) {
         console.error("Failed to fetch recipes:", err);
-        setRecipes(applyFilters(allRecipes, search, activeCuisine, activeDiet));
+        const local = sortRecipes(applyFilters(allRecipes, search, activeCuisine, activeDiet), sortBy, sortOrder);
+        const localTotal = local.length;
+        const start = (page - 1) * pageSize;
+        const paged = local.slice(start, start + pageSize);
+
+        setRecipes(paged);
+        setTotalCount(localTotal);
+        setTotalPages(Math.max(1, Math.ceil(localTotal / pageSize)));
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [search, activeCuisine, activeDiet]);
+  }, [search, activeCuisine, activeDiet, page, pageSize, sortBy, sortOrder, reloadKey]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -145,11 +194,85 @@ export default function RecipesList() {
     });
   };
 
-  const filtered = recipes;
+  const buildRecipePayload = (recipe) => ({
+    title: recipe.title,
+    cuisine: recipe.cuisine,
+    diet: recipe.diet,
+    time: recipe.time,
+    calories: Number(recipe.calories) || null,
+    difficulty: recipe.difficulty,
+    meal: recipe.meal,
+    image: recipe.image,
+    pantry_match: Number(recipe.pantry_match) || null,
+    cultural: recipe.cultural,
+    ingredients: recipe.ingredients,
+    nutrition: recipe.nutrition,
+    health_benefits: recipe.health_benefits,
+    steps: recipe.steps,
+    similar_dishes: recipe.similar_dishes,
+    food_labels: recipe.food_labels,
+  });
+
+  const saveRecipeCopy = async (recipe) => {
+    try {
+      const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+      const response = await fetch(`${API_BASE.replace(/\/$/, "")}/recipes/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildRecipePayload(recipe)),
+      });
+
+      if (!response.ok) throw new Error(`Save failed with ${response.status}`);
+
+      const saved = await response.json();
+      navigate(`/recipe/${saved.id}`, { state: { recipe: normalizeRecipe(saved) } });
+    } catch (error) {
+      setActionError(error.message || "Unable to save recipe copy.");
+    }
+  };
+
+  const deleteRecipe = async (recipe) => {
+    if (recipe.id < 0) {
+      setActionError("External recipes cannot be deleted.");
+      return;
+    }
+
+    if (!window.confirm(`Delete ${recipe.title}?`)) return;
+
+    try {
+      const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+      const response = await fetch(`${API_BASE.replace(/\/$/, "")}/recipes/${recipe.id}`, { method: "DELETE" });
+      if (!response.ok) throw new Error(`Delete failed with ${response.status}`);
+
+      setReloadKey((key) => key + 1);
+    } catch (error) {
+      setActionError(error.message || "Unable to delete recipe.");
+    }
+  };
+
+  const openRecipe = (recipe, index) => {
+    navigate(`/recipe/${recipe.id}`, {
+      state: {
+        recipe,
+        listContext: {
+          recipes,
+          currentIndex: index,
+          page,
+          pageSize,
+          totalCount,
+          totalPages,
+          search,
+          activeCuisine,
+          activeDiet,
+          sortBy,
+          sortOrder,
+        },
+      },
+    });
+  };
 
   return (
     <div className="rl-page">
-      {/* ── Navbar ─────────────────────────────────────────── */}
       <nav className="navbar">
         <div className="logo">🍲 RecipeDiscover</div>
         <div className="nav-links">
@@ -183,7 +306,6 @@ export default function RecipesList() {
           />
         </div>
 
-        {/* Favorites navbar icon */}
         <div className="rl-nav-fav" ref={favRef}>
           <button
             className={`rl-nav-fav-btn${favOpen ? " open" : ""}`}
@@ -191,9 +313,7 @@ export default function RecipesList() {
             title="My Favorites"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill={favorites.length > 0 ? "#e53e3e" : "none"} stroke={favorites.length > 0 ? "#e53e3e" : "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-            {favorites.length > 0 && (
-              <span className="rl-nav-fav-badge">{favorites.length}</span>
-            )}
+            {favorites.length > 0 && <span className="rl-nav-fav-badge">{favorites.length}</span>}
           </button>
 
           {favOpen && (
@@ -213,11 +333,7 @@ export default function RecipesList() {
                         <span className="rl-fav-item-title">{r.title}</span>
                         <span className="rl-fav-item-cuisine">{r.cuisine} · {r.time}</span>
                       </div>
-                      <button
-                        className="rl-fav-item-remove"
-                        onClick={() => toggleFav(r.id)}
-                        title="Remove"
-                      >
+                      <button className="rl-fav-item-remove" onClick={() => toggleFav(r.id)} title="Remove">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                       </button>
                     </li>
@@ -231,25 +347,17 @@ export default function RecipesList() {
         <ProfileDropdown />
       </nav>
 
-      {/* ── Page Header ─────────────────────────────────────── */}
       <div className="rl-header">
         <h1 className="rl-title">All Recipes</h1>
-        <p className="rl-subtitle">
-          Explore {recipes.length}+ recipes from cuisines around the world
-        </p>
+        <p className="rl-subtitle">Explore {totalCount}+ recipes from cuisines around the world</p>
       </div>
 
-      {/* ── Filter Bar ──────────────────────────────────────── */}
       <div className="rl-filter-bar">
         <div className="rl-filter-row">
           <span className="rl-filter-label">Cuisine</span>
           <div className="rl-pills">
             {CUISINES.map((c) => (
-              <button
-                key={c}
-                className={`rl-pill${activeCuisine === c ? " active" : ""}`}
-                onClick={() => setActiveCuisine(c)}
-              >
+              <button key={c} className={`rl-pill${activeCuisine === c ? " active" : ""}`} onClick={() => setActiveCuisine(c)}>
                 {c}
               </button>
             ))}
@@ -259,11 +367,7 @@ export default function RecipesList() {
           <span className="rl-filter-label">Diet</span>
           <div className="rl-pills">
             {["All", "Vegetarian", "Vegan", "Non-Vegetarian"].map((d) => (
-              <button
-                key={d}
-                className={`rl-pill${activeDiet === d ? " active" : ""}`}
-                onClick={() => setActiveDiet(d)}
-              >
+              <button key={d} className={`rl-pill${activeDiet === d ? " active" : ""}`} onClick={() => setActiveDiet(d)}>
                 {d}
               </button>
             ))}
@@ -271,27 +375,52 @@ export default function RecipesList() {
         </div>
       </div>
 
-      {/* ── Recipe Count ────────────────────────────────────── */}
-      <div className="rl-count">
-        Showing <strong>{filtered.length}</strong> of {recipes.length} recipes
+      <div className="rl-toolbar">
+        <div className="rl-toolbar-group">
+          <span className="rl-toolbar-label">Sort</span>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="rl-toolbar-select">
+            <option value="id">Newest</option>
+            <option value="title">Title</option>
+            <option value="cuisine">Cuisine</option>
+            <option value="calories">Calories</option>
+            <option value="time">Cooking time</option>
+            <option value="pantry_match">Pantry match</option>
+          </select>
+          <button className="rl-toolbar-toggle" onClick={() => setSortOrder((order) => (order === "asc" ? "desc" : "asc"))}>
+            {sortOrder === "asc" ? "Asc" : "Desc"}
+          </button>
+        </div>
+        <div className="rl-toolbar-group">
+          <span className="rl-toolbar-label">Per page</span>
+          <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} className="rl-toolbar-select">
+            {[6, 12, 24].map((value) => (
+              <option key={value} value={value}>{value}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      {/* ── Recipe Grid ─────────────────────────────────────── */}
+      <div className="rl-count">
+        Showing <strong>{recipes.length}</strong> of {totalCount} recipes · Page {page} of {totalPages}
+      </div>
+
+      {actionError && <div className="rl-empty" style={{ maxWidth: 1280, margin: "0 auto 18px", color: "#b91c1c" }}>{actionError}</div>}
+
       <div className="rl-grid">
-          {loading ? (
-          <div className="rl-empty" style={{textAlign:"center",padding:"2rem"}}>🔍 Searching recipes...</div>
-        ) : filtered.length === 0 ? (
+        {loading ? (
+          <div className="rl-empty" style={{ textAlign: "center", padding: "2rem" }}>Searching recipes...</div>
+        ) : recipes.length === 0 ? (
           <div className="rl-empty">No recipes match your filters. Try a different search.</div>
         ) : (
-          filtered.map((r) => (
+          recipes.map((r, index) => (
             <div
               className="rl-card"
               key={r.id}
-              onClick={(e) => { console.log('card click', r.id); navigate(`/recipe/${r.id}`, { state: { recipe: r } }); }}
+              onClick={() => openRecipe(r, index)}
               role="button"
               tabIndex={0}
-              onKeyDown={(e) => { if (e.key === 'Enter') { console.log('card key enter', r.id); navigate(`/recipe/${r.id}`, { state: { recipe: r } }); } }}
-              style={{ cursor: 'pointer' }}
+              onKeyDown={(e) => { if (e.key === "Enter") openRecipe(r, index); }}
+              style={{ cursor: "pointer" }}
             >
               <div className="rl-card-img-wrap">
                 <img src={r.image} alt={r.title} className="rl-card-img" />
@@ -308,10 +437,7 @@ export default function RecipesList() {
                 <h3 className="rl-card-title">{r.title}</h3>
                 <div className="rl-card-meta">
                   <span className="rl-meta-tag rl-meal">{r.meal}</span>
-                  <span
-                    className="rl-meta-tag rl-diet"
-                    style={{ background: (DIET_COLORS[r.diet] || "#6b7280") + "22", color: DIET_COLORS[r.diet] || "#6b7280" }}
-                  >
+                  <span className="rl-meta-tag rl-diet" style={{ background: (DIET_COLORS[r.diet] || "#6b7280") + "22", color: DIET_COLORS[r.diet] || "#6b7280" }}>
                     {r.diet}
                   </span>
                 </div>
@@ -330,17 +456,57 @@ export default function RecipesList() {
                   </span>
                 </div>
 
-                <button
-                  className="rl-open-btn"
-                  onClick={(e) => { e.stopPropagation(); console.log('view details click', r.id); navigate(`/recipe/${r.id}`, { state: { recipe: r } }); }}
-                >
+                <button className="rl-open-btn" onClick={(e) => { e.stopPropagation(); openRecipe(r, index); }}>
                   View Details
                 </button>
 
+                <div className="rl-card-actions">
+                  <button className="rl-card-action-btn" onClick={(e) => { e.stopPropagation(); saveRecipeCopy(r); }}>
+                    Save Copy
+                  </button>
+                  <button className="rl-card-action-btn" onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/recipe/${r.id}?edit=1`, {
+                      state: {
+                        recipe: r,
+                        listContext: {
+                          recipes,
+                          currentIndex: index,
+                          page,
+                          pageSize,
+                          totalCount,
+                          totalPages,
+                          search,
+                          activeCuisine,
+                          activeDiet,
+                          sortBy,
+                          sortOrder,
+                        },
+                      },
+                    });
+                  }}>
+                    Edit
+                  </button>
+                  {r.id >= 0 && (
+                    <button className="rl-card-action-btn danger" onClick={(e) => { e.stopPropagation(); deleteRecipe(r); }}>
+                      Delete
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           ))
         )}
+      </div>
+
+      <div className="rl-pagination">
+        <button className="rl-pagination-btn" disabled={page <= 1 || loading} onClick={() => setPage((current) => Math.max(1, current - 1))}>
+          Previous
+        </button>
+        <span className="rl-pagination-info">Page {page} of {totalPages}</span>
+        <button className="rl-pagination-btn" disabled={page >= totalPages || loading} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>
+          Next
+        </button>
       </div>
     </div>
   );

@@ -324,6 +324,104 @@ const estimateNutrition = (calories, highProtein, lowOil) => ({
   fat: Math.max(8, Math.round((calories * (lowOil ? 0.2 : 0.28)) / 9)),
 });
 
+const BACKEND_BASE_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+
+const toNumberOrNull = (value) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+};
+
+const parseMinutes = (value, fallback = 35) => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.max(10, Math.min(180, Math.round(value)));
+  }
+
+  if (typeof value === "string") {
+    const match = value.match(/(\d+)/);
+    if (match) {
+      const parsed = Number(match[1]);
+      if (Number.isFinite(parsed)) {
+        return Math.max(10, Math.min(180, parsed));
+      }
+    }
+  }
+
+  return Math.max(10, Math.min(180, fallback));
+};
+
+const formatIngredientLine = (item) => {
+  if (!item) return "";
+  if (typeof item === "string") return item;
+
+  const quantity = item.quantity ?? "";
+  const unit = item.unit ?? "";
+  const name = item.name ?? "";
+  return [quantity, unit, name].map((part) => `${part ?? ""}`.trim()).filter(Boolean).join(" ").trim();
+};
+
+const toGeneratedRecipeFromAnalyzeApi = (payload, previewImageUrl, form) => {
+  const json = payload?.generated_recipe_json && typeof payload.generated_recipe_json === "object"
+    ? payload.generated_recipe_json
+    : {};
+
+  const ingredients = (Array.isArray(json.ingredients) ? json.ingredients : [])
+    .map(formatIngredientLine)
+    .filter(Boolean);
+
+  const steps = (Array.isArray(json.steps) ? json.steps : [])
+    .map((step) => `${step ?? ""}`.trim())
+    .filter(Boolean);
+
+  const tips = (Array.isArray(json.tips) ? json.tips : [])
+    .map((tip) => `${tip ?? ""}`.trim())
+    .filter(Boolean);
+
+  const servingsParsed = toNumberOrNull(json.servings);
+  const servings = servingsParsed ?? form.servings;
+
+  const cookTimeMinutes = parseMinutes(json.cook_time || json.prep_time, form.maxCookTime);
+
+  const calories = toNumberOrNull(json?.nutrition?.calories);
+  const estimatedCalories = calories ?? Math.max(220, 260 + ingredients.length * 16 + servings * 40);
+
+  const defaultMacros = estimateNutrition(estimatedCalories, form.highProtein, form.lowOil);
+
+  const protein = toNumberOrNull(json?.nutrition?.protein) ?? defaultMacros.protein;
+  const carbs = toNumberOrNull(json?.nutrition?.carbs) ?? defaultMacros.carbs;
+  const fat = toNumberOrNull(json?.nutrition?.fat) ?? defaultMacros.fat;
+
+  const title = json.title || payload?.matched_recipe?.title || "AI Vision Recipe";
+
+  return {
+    id: crypto.randomUUID(),
+    title,
+    cuisine: json.cuisine || payload?.matched_recipe?.cuisine || form.cuisine,
+    mealType: form.mealType,
+    dietType: form.dietType,
+    difficulty: form.difficulty,
+    spiceLevel: form.spiceLevel,
+    servings,
+    cookTimeMinutes,
+    estimatedCalories,
+    macros: {
+      protein: Math.max(8, Math.round(protein)),
+      carbs: Math.max(8, Math.round(carbs)),
+      fat: Math.max(4, Math.round(fat)),
+    },
+    ingredients: ingredients.length ? ingredients : parseIngredients(form.ingredientsText).map(titleCase),
+    steps: steps.length
+      ? steps
+      : [
+          "Prep all key ingredients shown in the image and keep them ready before cooking.",
+          "Build flavor with aromatics, then cook ingredients until texture and color match the uploaded dish.",
+          "Plate and adjust seasoning at the end for balance.",
+        ],
+    tips: tips.length ? tips : ["Use a clear top-view image for more accurate recipe generation."],
+    imageUrl: previewImageUrl,
+    createdAt: new Date().toISOString(),
+  };
+};
+
 const buildRecipeFromImageAnalysis = (analysis) => {
   const estimatedCalories = Math.max(260, 250 + analysis.ingredients.length * 22 + analysis.spiceLevel * 10);
   const ingredientTitle = analysis.ingredients[0] ?? "dish";
@@ -459,6 +557,30 @@ const toGeneratedRecipeFromApi = (meal, form) => {
     imageUrl: meal.strMealThumb,
     createdAt: new Date().toISOString(),
   };
+};
+
+const normalizeText = (value) => `${value ?? ""}`.toLowerCase();
+
+const inferDominantProfileFromSignals = (signalText) => {
+  const normalized = normalizeText(signalText);
+  let bestProfile = null;
+  let bestScore = 0;
+
+  for (const profile of dishProfiles) {
+    const score = profile.keywords.reduce((acc, keyword) => (normalized.includes(keyword) ? acc + 1 : acc), 0);
+    if (score > bestScore) {
+      bestScore = score;
+      bestProfile = profile;
+    }
+  }
+
+  return bestScore > 0 ? bestProfile : null;
+};
+
+const titleMatchesProfile = (title, profile) => {
+  if (!profile) return true;
+  const normalizedTitle = normalizeText(title);
+  return profile.keywords.some((keyword) => normalizedTitle.includes(keyword));
 };
 
 const fetchJson = async (url) => {
@@ -729,6 +851,96 @@ export default function GenerateRecipe() {
       setUploadedImagePreview(previewUrl);
       setUploadedImageName(file.name);
 
+      // Primary path: backend vision + RAG + LLM model pipeline.
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const response = await fetch(`${BACKEND_BASE_URL}/analyze/?debug=true`, {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Backend analyze failed with status ${response.status}`);
+        }
+
+        const payload = await response.json();
+        const backendRecipe = toGeneratedRecipeFromAnalyzeApi(payload, previewUrl, formRef.current);
+
+        const signalText = [
+          payload?.debug_info?.caption,
+          ...(Array.isArray(payload?.detected_labels) ? payload.detected_labels : []),
+          file.name,
+        ]
+          .filter(Boolean)
+          .join(" ");
+
+        const dominantProfile = inferDominantProfileFromSignals(signalText);
+        const missingStructuredJson = !(payload?.generated_recipe_json && typeof payload.generated_recipe_json === "object");
+
+        let recipe = backendRecipe;
+
+        // If backend JSON is missing or title doesn't align with image signals (e.g. pizza -> paneer), correct it.
+        if (dominantProfile && (missingStructuredJson || !titleMatchesProfile(backendRecipe.title, dominantProfile))) {
+          const correctedAnalysis = {
+            title: dominantProfile.title,
+            cuisine: dominantProfile.cuisine,
+            mealType: dominantProfile.mealType,
+            dietType: dominantProfile.dietType,
+            difficulty: dominantProfile.difficulty,
+            spiceLevel: dominantProfile.spiceLevel,
+            servings: dominantProfile.mealType === "Breakfast" ? 1 : 2,
+            maxCookTime: dominantProfile.maxCookTime,
+            ingredients: dominantProfile.ingredients,
+            notes: [
+              "Corrected using image-label alignment to avoid dish mismatch.",
+              ...(payload?.debug_info?.caption ? [`Vision caption: ${payload.debug_info.caption}`] : []),
+            ],
+            confidence: 78,
+            modelName: "Signal-Aligned Vision Correction",
+            caption: payload?.debug_info?.caption || signalText,
+          };
+
+          const correctedRecipe = buildRecipeFromImageAnalysis(correctedAnalysis);
+          recipe = {
+            ...correctedRecipe,
+            imageUrl: previewUrl,
+          };
+        }
+
+        const confidenceFromScores = Array.isArray(payload?.confidence_scores) && payload.confidence_scores.length
+          ? Math.round(Math.max(...payload.confidence_scores) * 100)
+          : 70;
+
+        const analysis = {
+          title: recipe.title,
+          cuisine: recipe.cuisine,
+          caption: payload?.debug_info?.caption || payload?.message || "Detected visual food concepts",
+          ingredients: recipe.ingredients.slice(0, 8),
+          modelName: "BLIP/Clarifai + Flan-T5 + RAG",
+          confidence: confidenceFromScores,
+        };
+
+        setUploadedImageAnalysis(analysis);
+        setGeneratedRecipe(recipe);
+        setLastSavedRecipeId(null);
+
+        setForm((previous) => ({
+          ...previous,
+          recipeIdea: recipe.title,
+          cuisine: recipe.cuisine || previous.cuisine,
+          servings: recipe.servings || previous.servings,
+          maxCookTime: recipe.cookTimeMinutes || previous.maxCookTime,
+          ingredientsText: serializeIngredients(recipe.ingredients.slice(0, 12).map((item) => `${item}`.toLowerCase())),
+        }));
+
+        showNotice("success", `${recipe.title} generated from image using the backend AI model.`);
+        return;
+      } catch {
+        // Fallback path continues below (browser-side inference).
+      }
+
       const [pipelineModule, zeroShotModule, rawImage] = await Promise.all([
         loadImageCaptionPipeline(),
         loadZeroShotImagePipeline(),
@@ -764,7 +976,7 @@ export default function GenerateRecipe() {
         ingredientsText: serializeIngredients(analysis.ingredients),
       }));
 
-      showNotice("success", `${analysis.title} was generated from your uploaded dish image.`);
+      showNotice("success", `${analysis.title} was generated from your uploaded dish image (local fallback).`);
     } catch {
       showNotice("error", "Image analysis failed. Try a clearer image or use text input mode.");
     } finally {
@@ -885,7 +1097,7 @@ export default function GenerateRecipe() {
         <section className="gr-hero">
           <div>
             <h1>Generate Recipes</h1>
-            <p>Build personalized recipes with ingredient-based generation and optional image-based AI inference.</p>
+            <p>Build personalized recipes with ingredient-based generation and image-based AI model inference.</p>
           </div>
           <div className="gr-badge">
             <Sparkles size={14} /> Smart Generator v2
@@ -946,7 +1158,7 @@ export default function GenerateRecipe() {
                   <div className="gr-field">
                     <label htmlFor="dish-image">Upload dish image</label>
                     <input id="dish-image" ref={imageInputRef} type="file" accept="image/*" onChange={handleImageSelection} />
-                    <p className="gr-file-help">Upload a clear dish photo. Browser model caption + classifier will infer recipe.</p>
+                    <p className="gr-file-help">Upload a clear dish photo. Backend vision model + recipe generator will infer recipe.</p>
                   </div>
 
                   {uploadedImagePreview ? (
