@@ -215,6 +215,103 @@
   flex-wrap: wrap;
 }
 
+.rd-action-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+.rd-action-btn {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.rd-action-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.rd-action-btn.primary {
+  background: linear-gradient(135deg, #ff6a00 0%, #ff8c00 100%);
+  border-color: #ff6a00;
+}
+
+.rd-action-btn.danger {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.rd-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.rd-edit-header {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.rd-edit-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.rd-edit-error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid rgba(185, 28, 28, 0.2);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 18px;
+  font-weight: 600;
+}
+
+.rd-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.rd-edit-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.rd-edit-grid input,
+.rd-edit-grid textarea {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  background: #fff;
+  color: #111827;
+}
+
+.rd-edit-grid textarea {
+  resize: vertical;
+}
+
+.rd-edit-wide {
+  grid-column: 1 / -1;
+}
+
 .rd-order-btn {
   display: inline-flex;
   align-items: center;
@@ -275,6 +372,16 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+@media (max-width: 760px) {
+  .rd-edit-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rd-edit-header {
+    align-items: stretch;
+  }
 }
 
 /* Card */

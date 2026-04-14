@@ -66,6 +66,54 @@ class RecipeOut(BaseModel):
         from_attributes = True
 
 
+class RecipeCreate(BaseModel):
+    title: str
+    cuisine: Optional[str] = None
+    diet: Optional[str] = None
+    time: Optional[str] = None
+    calories: Optional[int] = None
+    difficulty: Optional[str] = None
+    meal: Optional[str] = None
+    image: Optional[str] = None
+    pantry_match: Optional[int] = None
+    cultural: Optional[str] = None
+    ingredients: Optional[Any] = None
+    nutrition: Optional[Any] = None
+    health_benefits: Optional[Any] = None
+    steps: Optional[Any] = None
+    similar_dishes: Optional[Any] = None
+    food_labels: Optional[Any] = None
+
+
+class RecipeUpdate(BaseModel):
+    title: Optional[str] = None
+    cuisine: Optional[str] = None
+    diet: Optional[str] = None
+    time: Optional[str] = None
+    calories: Optional[int] = None
+    difficulty: Optional[str] = None
+    meal: Optional[str] = None
+    image: Optional[str] = None
+    pantry_match: Optional[int] = None
+    cultural: Optional[str] = None
+    ingredients: Optional[Any] = None
+    nutrition: Optional[Any] = None
+    health_benefits: Optional[Any] = None
+    steps: Optional[Any] = None
+    similar_dishes: Optional[Any] = None
+    food_labels: Optional[Any] = None
+
+
+class RecipeListResponse(BaseModel):
+    items: List[RecipeOut]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+    sort_by: str
+    sort_order: str
+
+
 # ── Analyze ────────────────────────────────────────────────
 class AnalyzeResult(BaseModel):
     detected_labels: List[str]
