@@ -1,6 +1,6 @@
 import base64
 import requests
-from config import settings
+from .config import settings
 
 from typing import List
 
@@ -170,7 +170,7 @@ def match_recipe(labels: list[str], db) -> object | None:
     Fuzzy-match detected labels against recipe food_labels stored in DB.
     Returns the best-matching Recipe ORM object or None.
     """
-    from models import Recipe
+    from .models import Recipe
 
     all_recipes = db.query(Recipe).all()
     best_recipe = None

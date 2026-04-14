@@ -29,8 +29,17 @@ class Settings(BaseSettings):
     # Redis for background jobs (RQ)
     REDIS_URL: str = "redis://localhost:6379/0"
 
+    # Google Vision: path to service account JSON (optional). If set, Vision API will be used.
+    GOOGLE_APPLICATION_CREDENTIALS: str | None = None
+    # Synonyms JSON file path for ingredient/dish normalization (editable, no code changes required)
+    SYNONYMS_FILE: str | None = "backend/synonyms.json"
+    # Minimum match score required to accept an automatic database recipe match
+    MATCH_SCORE_THRESHOLD: float = 3.0
+
     class Config:
-        env_file = ".env"
+        # Ensure we load the backend-specific env file even when started
+        # from the repository root (scripts use repo root as CWD).
+        env_file = "backend/.env"
 
 
 settings = Settings()

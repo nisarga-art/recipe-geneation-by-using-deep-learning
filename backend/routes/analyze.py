@@ -1,13 +1,14 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from sqlalchemy.orm import Session
-from database import get_db
-from clarifai_service import analyze_image_bytes, match_recipe, get_image_caption
-from llm_service import generate_recipe
-from rag_service import search as rag_search
-from rag_service import build_index_from_recipes, save_index
-from schemas import AnalyzeResult
-from models import Recipe
+from ..database import get_db
+from ..vision_service import analyze_image_bytes, match_recipe, get_image_caption
+from ..llm_service import generate_recipe
+from ..rag_service import search as rag_search
+from ..rag_service import build_index_from_recipes, save_index
+from ..schemas import AnalyzeResult
+from ..models import Recipe
 import json
+from ..config import settings
 
 router = APIRouter(prefix="/analyze", tags=["Analyze"])
 
@@ -52,8 +53,16 @@ async def analyze_food_image(
     label_names = [p["name"] for p in top_labels]
     confidence_scores = [p["value"] for p in top_labels]
 
-    # Match against our recipe DB
-    matched = match_recipe(label_names, db)
+    # Match against our recipe DB using scored matching (uses label confidences)
+    matched, match_score = match_recipe(top_labels, db)
+
+    # Enforce minimum match score threshold — treat as no match if below threshold
+    try:
+        if matched and (match_score is None or match_score < settings.MATCH_SCORE_THRESHOLD):
+            matched = None
+    except Exception:
+        # if settings or match_score unavailable, ignore and continue
+        pass
 
     # Retrieve related recipes from RAG index (if available) using labels + caption
     retrieved = []
@@ -201,6 +210,8 @@ async def analyze_food_image(
                 "prompt": prompt,
                 "raw_generated": generated,
                 "parsed_json": parsed,
+                "matched_score": (match_score if 'match_score' in locals() else None),
+                "matched_id": (matched.id if matched else None),
             }
             if debug
             else None

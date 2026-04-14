@@ -1,30 +1,57 @@
-from config import settings
+from .config import settings
 from typing import Optional
 
+# Defer heavy ML imports so module import doesn't fail when optional
+# dependencies are not installed (frontend-only development).
 _MODEL = None
 _TOKENIZER = None
+_TORCH = None
 
 
-def _load_model():
-    global _MODEL, _TOKENIZER
-    if _MODEL is not None and _TOKENIZER is not None:
-        return _MODEL, _TOKENIZER
-
-    # Lazy import heavy ML deps so API boot is not blocked unless generation is used.
+def _import_transformers_and_torch():
     try:
         import torch
         from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-    except Exception as exc:
+        return AutoTokenizer, AutoModelForSeq2SeqLM, torch
+    except Exception as e:
         raise RuntimeError(
-            "Missing optional ML dependencies. Install backend requirements to use LLM generation."
-        ) from exc
+            "Missing ML dependencies (transformers/torch). Install 'pip install -r requirements.txt' "
+            "or remove ML routes for frontend-only development."
+        ) from e
+
+
+def _load_model():
+    global _MODEL, _TOKENIZER, _TORCH
+    if _MODEL is not None and _TOKENIZER is not None and _TORCH is not None:
+        return _MODEL, _TOKENIZER
+
+    AutoTokenizer, AutoModelForSeq2SeqLM, torch = _import_transformers_and_torch()
+    _TORCH = torch
 
     model_name = settings.FLAN_MODEL_NAME
-    device = torch.device("cuda" if settings.FLAN_USE_CUDA and torch.cuda.is_available() else "cpu")
+    use_cuda = getattr(settings, "FLAN_USE_CUDA", False) and torch.cuda.is_available()
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-    model = model.to(device)
+    tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
+
+    # Try to load in an efficient way if CUDA is available
+    try:
+        if use_cuda:
+            model = AutoModelForSeq2SeqLM.from_pretrained(
+                model_name,
+                device_map="auto",
+                torch_dtype=torch.float16,
+                low_cpu_mem_usage=True,
+            )
+        else:
+            model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    except Exception:
+        # Fallback to a safer CPU load
+        model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+
+    # If device_map wasn't used, move to device
+    if not use_cuda:
+        device = torch.device("cpu")
+        model = model.to(device)
 
     _MODEL = model
     _TOKENIZER = tokenizer
@@ -46,11 +73,12 @@ def generate_recipe(
     device = next(model.parameters()).device
 
     gen_kwargs = {
-        "max_length": max_length or settings.FLAN_MAX_TOKENS,
+        "max_new_tokens": max_length or settings.FLAN_MAX_TOKENS,
         "temperature": float(settings.FLAN_TEMPERATURE),
         "do_sample": True,
         "top_p": 0.95,
         "num_return_sequences": 1,
+        "pad_token_id": tokenizer.pad_token_id or tokenizer.eos_token_id,
     }
 
     # include retrieval context if provided
@@ -58,8 +86,23 @@ def generate_recipe(
         context_text = "\n\nContext recipes:\n" + "\n---\n".join(context_docs[:5])
         prompt = context_text + "\n\n" + prompt
 
-    inputs = tokenizer(prompt, return_tensors="pt", truncation=True).to(device)
-    with torch.no_grad():
+    # tokenize with padding/truncation and move to the model device
+    inputs = tokenizer(
+        prompt,
+        return_tensors="pt",
+        truncation=True,
+        padding=True,
+        max_length=settings.FLAN_MAX_TOKENS,
+    )
+
+    # move tensors to model device if possible
+    try:
+        device = next(model.parameters()).device
+        inputs = {k: v.to(device) for k, v in inputs.items()}
+    except Exception:
+        pass
+
+    with _TORCH.no_grad():
         output_ids = model.generate(**inputs, **gen_kwargs)
 
     text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
@@ -69,6 +112,7 @@ def generate_recipe(
 
     # Enforce JSON: try parse, otherwise attempt simple repair by re-prompting
     import json
+    import re
 
     def try_parse(s: str):
         try:
@@ -80,10 +124,8 @@ def generate_recipe(
     if parsed is not None:
         return text, parsed
 
-    # attempt to extract a JSON substring
-    import re
-
-    match = re.search(r"\{(?:[^{}]|(?R))*\}", text)
+    # attempt to extract a JSON substring (simple DOTALL match)
+    match = re.search(r"\{.*\}", text, flags=re.DOTALL)
     if match:
         parsed = try_parse(match.group(0))
         if parsed is not None:
@@ -97,15 +139,16 @@ def generate_recipe(
             "Please output ONLY a single valid JSON object matching the schema provided earlier."
         )
         # feed the repair prompt as new input
-        inputs = tokenizer(repair_prompt, return_tensors="pt", truncation=True).to(device)
-        with torch.no_grad():
+        inputs = tokenizer(repair_prompt, return_tensors="pt", truncation=True, padding=True)
+        inputs = {k: v.to(device) for k, v in inputs.items()}
+        with _TORCH.no_grad():
             out_ids = model.generate(**inputs, **gen_kwargs)
         repaired = tokenizer.decode(out_ids[0], skip_special_tokens=True)
         parsed = try_parse(repaired)
         if parsed is not None:
             return repaired, parsed
         # try extracting JSON substring
-        m = re.search(r"\{(?:[^{}]|(?R))*\}", repaired)
+        m = re.search(r"\{.*\}", repaired, flags=re.DOTALL)
         if m:
             parsed = try_parse(m.group(0))
             if parsed is not None:
