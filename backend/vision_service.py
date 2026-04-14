@@ -201,6 +201,29 @@ def analyze_image_bytes(image_bytes: bytes) -> list[dict]:
             pass
 
     # Local fallback: caption + simple extraction
+    # First try an on-disk classifier if available (faster, deterministic dish labels)
+    try:
+        from . import dish_classifier
+    except Exception:
+        dish_classifier = None
+
+    if dish_classifier is not None:
+        try:
+            preds = dish_classifier.predict(image_bytes, topk=3)
+            if preds:
+                labels = []
+                for p in preds:
+                    labels.append({
+                        "name": _apply_rule_map(str(p.get("name", "")).lower()),
+                        "value": float(p.get("value", 0.0)),
+                        "source": "classifier",
+                    })
+                # return classifier-first results (these are high-precision dish names)
+                return labels
+        except Exception:
+            # ignore classifier errors and fall back to captioning
+            pass
+
     pipeline = _load_caption_pipeline()
     labels = []
     if pipeline is None:

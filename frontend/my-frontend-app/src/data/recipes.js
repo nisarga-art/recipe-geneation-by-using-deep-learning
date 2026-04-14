@@ -559,5 +559,99 @@ const recipes = [
   }
 ];
 
+// Added recipes
+recipes.push(
+  {
+    id: 24,
+    title: "Matar Paneer",
+    cuisine: "North Indian",
+    diet: "Vegetarian",
+    time: "40 minutes",
+    calories: 420,
+    difficulty: "Medium",
+    meal: "Dinner",
+    image: "https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=600&q=80",
+    pantryMatch: 78,
+    ingredients: { available: ["Paneer", "Green Peas", "Tomato", "Onion"], missing: ["Cream"] },
+    nutrition: { protein: 18, carbs: 30, fat: 22, fiber: 6 },
+    healthBenefits: ["Calcium rich", "Good protein"],
+    steps: ["Sauté onions and tomatoes","Add spices and peas","Add paneer cubes and simmer"],
+    cultural: "Comforting Punjabi curry served with roti or rice.",
+    similarDishes: ["Paneer Butter Masala", "Shahi Paneer"]
+  },
+  {
+    id: 25,
+    title: "Gulab Jamun",
+    cuisine: "Indian",
+    diet: "Vegetarian",
+    time: "45 minutes",
+    calories: 320,
+    difficulty: "Medium",
+    meal: "Dessert",
+    image: "https://images.unsplash.com/photo-1604908177522-8b4a5f7f28a6?w=800&q=80",
+    pantryMatch: 88,
+    ingredients: { available: ["Milk Powder", "Sugar", "Ghee"], missing: [] },
+    nutrition: { protein: 6, carbs: 60, fat: 10, fiber: 0 },
+    healthBenefits: ["High calorie treat"],
+    steps: ["Make dough from milk powder","Shape balls and fry","Soak in sugar syrup"],
+    cultural: "Classic Indian sweet often served at festivals and celebrations.",
+    similarDishes: ["Rasgulla", "Kheer"]
+  },
+  {
+    id: 26,
+    title: "Vegetable Biryani",
+    cuisine: "Indian",
+    diet: "Vegan",
+    time: "60 minutes",
+    calories: 480,
+    difficulty: "Medium",
+    meal: "Dinner",
+    image: "https://images.unsplash.com/photo-1601924582971-7f7f6d1f6d6b?w=600&q=80",
+    pantryMatch: 74,
+    ingredients: { available: ["Basmati Rice", "Mixed Vegetables", "Spices"], missing: ["Saffron"] },
+    nutrition: { protein: 10, carbs: 80, fat: 12, fiber: 8 },
+    healthBenefits: ["Vegetarian comfort meal"],
+    steps: ["Parboil rice","Cook vegetables with spices","Layer and cook on dum"],
+    cultural: "A vegetarian take on classic biryani styles.",
+    similarDishes: ["Pulao", "Dum Biryani"]
+  },
+  {
+    id: 27,
+    title: "Rogan Josh",
+    cuisine: "Kashmiri",
+    diet: "Non-Vegetarian",
+    time: "70 minutes",
+    calories: 620,
+    difficulty: "Medium",
+    meal: "Dinner",
+    image: "https://images.unsplash.com/photo-1543352634-2d4b9c04a0a4?w=600&q=80",
+    pantryMatch: 68,
+    ingredients: { available: ["Lamb", "Yogurt", "Kashmiri Chili"], missing: [] },
+    nutrition: { protein: 36, carbs: 8, fat: 32, fiber: 1 },
+    healthBenefits: ["High protein"],
+    steps: ["Marinate lamb","Cook in aromatic gravy","Simmer until tender"],
+    cultural: "A signature dish from Kashmir, rich and aromatic.",
+    similarDishes: ["Raan", "Korma"]
+  },
+  {
+    id: 28,
+    title: "Kheer (Rice Pudding)",
+    cuisine: "Indian",
+    diet: "Vegetarian",
+    time: "50 minutes",
+    calories: 300,
+    difficulty: "Easy",
+    meal: "Dessert",
+    image: "https://images.unsplash.com/photo-1581235720704-8d4a5a1b9a0a?w=600&q=80",
+    pantryMatch: 85,
+    ingredients: { available: ["Milk", "Rice", "Sugar", "Cardamom"], missing: [] },
+    nutrition: { protein: 6, carbs: 40, fat: 10, fiber: 0 },
+    healthBenefits: ["Comforting dessert"],
+    steps: ["Boil milk and rice","Simmer until creamy","Add sugar and flavorings"],
+    cultural: "Traditional rice pudding enjoyed across South Asia.",
+    similarDishes: ["Payasam", "Rice Kheer"]
+  }
+);
+
 export default recipes;
 

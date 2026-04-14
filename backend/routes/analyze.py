@@ -9,6 +9,9 @@ from ..schemas import AnalyzeResult
 from ..models import Recipe
 import json
 from ..config import settings
+from config import settings
+from backend.dish_classifier import load_model, class_names
+
 
 router = APIRouter(prefix="/analyze", tags=["Analyze"])
 
@@ -193,6 +196,15 @@ async def analyze_food_image(
         except Exception:
             pass
     except Exception:
+
+        outputs = model(image_tensor)
+probs = torch.nn.functional.softmax(outputs, dim=1)
+confidence, predicted_class = torch.max(probs, 1)
+
+pred_conf = confidence.item()
+pred_label = class_names[predicted_class.item()]
+logger.info(f"Classifier predicted {pred_label} with confidence {pred_conf:.2f}")
+
         # swallow DB errors to keep endpoint responsive
         new_recipe = None
 
@@ -221,3 +233,17 @@ async def analyze_food_image(
             + (f"Best match: {matched.title}" if matched else "No matching recipe found in database.")
         ),
     )
+if pred_conf >= settings.CLASSIFIER_CONFIDENCE_THRESHOLD:
+    dish_name = pred_label.replace("_", " ").lower()
+else:
+    logger.warning("Low confidence, falling back to default detection")
+    dish_name = None
+if dish_name:
+    recipe = recipe_db.get(dish_name)
+    if recipe:
+        return recipe
+    else:
+        logger.warning(f"No recipe found for {dish_name}")
+        return {"error": "Recipe not found"}
+else:
+    return fallback_detection(image_tensor)
