@@ -50,12 +50,13 @@ app.add_middleware(
 # optional dependencies), keep the app running so the frontend can be
 # developed without the full ML stack installed.
 try:
-    from .routes import analyze, recipes, auth, health_plan
+    from .routes import analyze, recipes, auth, health_plan, train
 
     app.include_router(auth.router)
     app.include_router(recipes.router)
     app.include_router(analyze.router)
     app.include_router(health_plan.router)
+    app.include_router(train.router)
 except Exception as e:
     # Log and continue — endpoints that depend on missing modules will
     # return 500s with tracebacks (middleware will surface them).

@@ -1,7 +1,9 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..vision_service import analyze_image_bytes, match_recipe, get_image_caption
+from sqlalchemy import func
 from ..llm_service import generate_recipe
 from ..rag_service import search as rag_search
 from ..rag_service import build_index_from_recipes, save_index
@@ -11,7 +13,6 @@ import json
 from ..config import settings
 from config import settings
 from backend.dish_classifier import load_model, class_names
-
 
 router = APIRouter(prefix="/analyze", tags=["Analyze"])
 
@@ -56,8 +57,46 @@ async def analyze_food_image(
     label_names = [p["name"] for p in top_labels]
     confidence_scores = [p["value"] for p in top_labels]
 
-    # Match against our recipe DB using scored matching (uses label confidences)
-    matched, match_score = match_recipe(top_labels, db)
+    # Classifier-first exact mapping: if vision_service tagged a label as coming
+    # from the local classifier and its confidence >= configured threshold,
+    # try an exact DB title lookup. If lookup fails, return "Recipe not found".
+    matched = None
+    match_score = None
+    classifier_candidate = None
+    for p in top_labels:
+        if p.get("source") == "classifier" and float(p.get("value", 0.0)) >= float(settings.CLASSIFIER_CONFIDENCE_THRESHOLD):
+            classifier_candidate = p
+            break
+
+    if classifier_candidate is not None:
+        cand = str(classifier_candidate.get("name", "")).replace("_", " ").strip().lower()
+        try:
+            matched = db.query(Recipe).filter(func.lower(Recipe.title) == cand).first()
+        except Exception:
+            matched = None
+
+        # If classifier predicted a recipe and we found an exact DB match, return it immediately.
+        if matched is not None:
+            debug_info = ({"classifier_label": classifier_candidate, "caption": caption} if debug else None)
+            return AnalyzeResult(
+                detected_labels=label_names,
+                confidence_scores=confidence_scores,
+                matched_recipe=matched,
+                generated_recipe=None,
+                generated_recipe_json=None,
+                debug_info=debug_info,
+                message=(f"Exact recipe found: {matched.title}"),
+            )
+
+        if classifier_candidate and matched is None:
+            # Classifier is confident but no exact mapping exists — return explicit error
+            debug_info = (
+                {"classifier_label": classifier_candidate, "caption": caption} if debug else None
+            )
+            return JSONResponse(status_code=404, content={"error": "Recipe not found", "debug": debug_info})
+    else:
+        # Fallback: use scored matching based on detected labels
+        matched, match_score = match_recipe(top_labels, db)
 
     # Enforce minimum match score threshold — treat as no match if below threshold
     try:
@@ -196,15 +235,6 @@ async def analyze_food_image(
         except Exception:
             pass
     except Exception:
-
-        outputs = model(image_tensor)
-probs = torch.nn.functional.softmax(outputs, dim=1)
-confidence, predicted_class = torch.max(probs, 1)
-
-pred_conf = confidence.item()
-pred_label = class_names[predicted_class.item()]
-logger.info(f"Classifier predicted {pred_label} with confidence {pred_conf:.2f}")
-
         # swallow DB errors to keep endpoint responsive
         new_recipe = None
 
@@ -233,17 +263,3 @@ logger.info(f"Classifier predicted {pred_label} with confidence {pred_conf:.2f}"
             + (f"Best match: {matched.title}" if matched else "No matching recipe found in database.")
         ),
     )
-if pred_conf >= settings.CLASSIFIER_CONFIDENCE_THRESHOLD:
-    dish_name = pred_label.replace("_", " ").lower()
-else:
-    logger.warning("Low confidence, falling back to default detection")
-    dish_name = None
-if dish_name:
-    recipe = recipe_db.get(dish_name)
-    if recipe:
-        return recipe
-    else:
-        logger.warning(f"No recipe found for {dish_name}")
-        return {"error": "Recipe not found"}
-else:
-    return fallback_detection(image_tensor)

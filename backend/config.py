@@ -36,6 +36,13 @@ class Settings(BaseSettings):
     # Minimum match score required to accept an automatic database recipe match
     MATCH_SCORE_THRESHOLD: float = 3.0
 
+    # Dish classifier settings (used by backend/dish_classifier.py and vision_service)
+    CLASSIFIER_MODEL_PATH: str = "backend/models/dish_classifier.pth"
+    CLASSIFIER_EPOCHS: int = 8
+    CLASSIFIER_BATCH_SIZE: int = 32
+    CLASSIFIER_LR: float = 1e-3
+    CLASSIFIER_CONFIDENCE_THRESHOLD: float = 0.75
+
     class Config:
         # Ensure we load the backend-specific env file even when started
         # from the repository root (scripts use repo root as CWD).

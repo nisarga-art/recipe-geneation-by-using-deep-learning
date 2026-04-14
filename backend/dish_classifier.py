@@ -21,7 +21,7 @@ from .config import settings
 
 _MODEL: torch.nn.Module | None = None
 _CLASSES: List[str] | None = None
-_MODEL_PATH: Path = Path(getattr(settings, "CLASSIFIER_MODEL_PATH", "backend/models/dish_classifier.pth"))
+_MODEL_PATH: Path = Path(settings.CLASSIFIER_MODEL_PATH)
 _CLASSES_PATH: Path = _MODEL_PATH.with_suffix(".classes.json")
 
 
@@ -87,13 +87,14 @@ def predict(image_bytes: bytes, topk: int = 3) -> List[dict]:
 def train(
     data_dir: str,
     output_path: str | None = None,
-    epochs: int = 5,
-    batch_size: int = 32,
-    lr: float = 1e-3,
+    epochs: int | None = None,
+    batch_size: int | None = None,
+    lr: float | None = None,
     device: str | None = None,
     val_split: float = 0.2,
     save_best: bool = True,
     seed: int = 42,
+    log_path: str | None = None,
 ) -> None:
     """Train a transfer-learning ResNet18 classifier on `data_dir` (ImageFolder layout).
 
@@ -106,6 +107,10 @@ def train(
 
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
     output_path = Path(output_path or _MODEL_PATH)
+    # use config defaults when parameters are not provided
+    epochs = int(epochs or settings.CLASSIFIER_EPOCHS)
+    batch_size = int(batch_size or settings.CLASSIFIER_BATCH_SIZE)
+    lr = float(lr or settings.CLASSIFIER_LR)
     data_dir = Path(data_dir)
     if not data_dir.exists():
         raise FileNotFoundError(f"Data dir not found: {data_dir}")
@@ -156,6 +161,22 @@ def train(
     best_acc = 0.0
     best_state = None
 
+    # Prepare logging file if requested
+    log_file = None
+    if log_path:
+        log_path = str(log_path)
+        log_file = Path(log_path)
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            lf = open(log_file, "w", encoding="utf-8")
+            lf.write("epoch,train_loss,train_acc,val_loss,val_acc\n")
+            lf.flush()
+        except Exception:
+            lf = None
+            log_file = None
+    else:
+        lf = None
+
     for ep in range(1, epochs + 1):
         model.train()
         running_loss = 0.0
@@ -201,6 +222,14 @@ def train(
 
         print(f"Epoch {ep}/{epochs}  train_loss={train_loss:.4f}  train_acc={train_acc:.4f}  val_loss={val_loss:.4f}  val_acc={val_acc:.4f}")
 
+        # write epoch stats to log file if available
+        if lf is not None:
+            try:
+                lf.write(f"{ep},{train_loss:.6f},{train_acc:.6f},{val_loss:.6f},{val_acc:.6f}\n")
+                lf.flush()
+            except Exception:
+                pass
+
         # checkpointing
         if save_best and val_loader is not None:
             if val_acc > best_acc:
@@ -216,6 +245,12 @@ def train(
         json.dump(classes, fh, ensure_ascii=False)
 
     print(f"Saved model to {output_path} (best_val_acc={best_acc:.4f})")
+    if lf is not None:
+        try:
+            lf.close()
+        except Exception:
+            pass
+    return float(best_acc)
 
 
 if __name__ == "__main__":
@@ -228,5 +263,6 @@ if __name__ == "__main__":
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--device", default=None)
+    parser.add_argument("--log", default=None, help="Path to write per-epoch training log (CSV)")
     args = parser.parse_args()
-    train(args.data_dir, output_path=args.output, epochs=args.epochs, batch_size=args.batch_size, lr=args.lr, device=args.device)
+    train(args.data_dir, output_path=args.output, epochs=args.epochs, batch_size=args.batch_size, lr=args.lr, device=args.device, log_path=args.log)
