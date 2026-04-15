@@ -1,3 +1,5 @@
+import importlib
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .database import engine, Base
@@ -46,21 +48,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Try to import and register routers. If any import fails (missing
-# optional dependencies), keep the app running so the frontend can be
-# developed without the full ML stack installed.
-try:
-    from .routes import analyze, recipes, auth, health_plan, train
+def _include_router(module_name: str) -> None:
+    """Load and include a router module without blocking other routers."""
+    try:
+        module = importlib.import_module(f".routes.{module_name}", __package__)
+        app.include_router(module.router)
+    except Exception as exc:
+        print(f"Warning: could not import route '{module_name}' at startup: {exc}")
 
-    app.include_router(auth.router)
-    app.include_router(recipes.router)
-    app.include_router(analyze.router)
-    app.include_router(health_plan.router)
-    app.include_router(train.router)
-except Exception as e:
-    # Log and continue — endpoints that depend on missing modules will
-    # return 500s with tracebacks (middleware will surface them).
-    print(f"Warning: could not import some routes at startup: {e}")
+
+for _route_module in ["auth", "recipes", "analyze", "health_plan", "train"]:
+    _include_router(_route_module)
 
 
 @app.get("/", tags=["Health"])

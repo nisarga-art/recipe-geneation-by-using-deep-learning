@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ProfileDropdown from "../components/ProfileDropdown";
 import allRecipes from "../data/allRecipes";
+import recipesData from "../data/recipes";
 import "../styles/RecipesList.css";
 
 const CUISINES = [
@@ -32,36 +33,98 @@ const DIET_COLORS = {
 
 const DEFAULT_IMAGE = "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80&auto=format&fit=crop";
 
-const normalizeRecipe = (item) => ({
-  id: item.id,
-  title: item.title || "Untitled Recipe",
-  cuisine: item.cuisine || "Fusion",
-  diet: item.diet || "Unknown",
-  time: item.time || "30 minutes",
-  calories: typeof item.calories === "number" ? item.calories : item.calories || "Unknown",
-  difficulty: item.difficulty || "Unknown",
-  meal: item.meal || "Main Course",
-  image: item.image || DEFAULT_IMAGE,
-  pantry_match: item.pantry_match ?? null,
-  steps: Array.isArray(item.steps) && item.steps.length
-    ? item.steps
-    : [
-        "Prep ingredients: chop aromatics, measure spices, ready protein/veg.",
-        "Cook base: heat oil, saute aromatics, toast spices until fragrant.",
-        "Build: add mains, simmer/roast until tender and flavors marry.",
-        "Finish: adjust seasoning, garnish, and serve warm.",
-      ],
-  ingredients: item.ingredients && typeof item.ingredients === "object"
-    ? item.ingredients
-    : { available: ["Main produce", "Protein or legumes", "Spice blend", "Oil"], missing: [] },
-  nutrition: item.nutrition && typeof item.nutrition === "object"
-    ? item.nutrition
-    : { protein: 12, carbs: 36, fat: 14, fiber: 5 },
-  health_benefits: Array.isArray(item.health_benefits) ? item.health_benefits : [],
-  similar_dishes: Array.isArray(item.similar_dishes) ? item.similar_dishes : [],
-  food_labels: Array.isArray(item.food_labels) ? item.food_labels : [],
-  cultural: item.cultural || null,
-});
+const CUISINE_AREA_MAP = {
+  indian: "Indian",
+  "north indian": "Indian",
+  "south indian": "Indian",
+  asian: "Chinese",
+  chinese: "Chinese",
+  japanese: "Japanese",
+  korean: "Japanese",
+  thai: "Thai",
+  mediterranean: "Greek",
+  greek: "Greek",
+  italian: "Italian",
+  french: "French",
+  western: "American",
+  american: "American",
+  mexican: "Mexican",
+  "middle eastern": "Moroccan",
+};
+
+const RECIPE_IMAGE_MAP = {
+  dosa: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Rameshwaram_Cafe_Dosa.jpg/330px-Rameshwaram_Cafe_Dosa.jpg",
+  paneer: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/Shahi_panner.jpg/330px-Shahi_panner.jpg",
+  biryani: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/%22Hyderabadi_Dum_Biryani%22.jpg/330px-%22Hyderabadi_Dum_Biryani%22.jpg",
+  salad: "https://images.unsplash.com/photo-1551248429-40975aa4de74?w=800&q=80&auto=format&fit=crop",
+  brownie: "https://images.unsplash.com/photo-1604908177522-8b4a5f7f28a6?w=800&q=80&auto=format&fit=crop",
+  pancake: "https://images.unsplash.com/photo-1528207776546-365bb710ee93?w=800&q=80&auto=format&fit=crop",
+  ramen: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Shoyu_ramen%2C_at_Kasukabe_Station_%282014.05.05%29_1.jpg/330px-Shoyu_ramen%2C_at_Kasukabe_Station_%282014.05.05%29_1.jpg",
+  prawn: "https://placehold.co/800x600/fde68a/7c2d12?text=Prawn+Curry",
+  shrimp: "https://placehold.co/800x600/fde68a/7c2d12?text=Shrimp+Curry",
+  fish: "https://placehold.co/800x600/c7d2fe/1e3a8a?text=Fish+Curry",
+  tofu: "https://placehold.co/800x600/d1fae5/065f46?text=Tofu+Stir+Fry",
+  soup: "https://images.unsplash.com/photo-1547592180-85f173990554?w=800&q=80&auto=format&fit=crop",
+  pizza: "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=800&q=80&auto=format&fit=crop",
+  burger: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&q=80&auto=format&fit=crop",
+  curry: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80&auto=format&fit=crop",
+  indian: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/Punjabi_style_Dal_Makhani.jpg/330px-Punjabi_style_Dal_Makhani.jpg",
+  asian: "https://images.unsplash.com/photo-1512058564366-18510be2db19?w=800&q=80&auto=format&fit=crop",
+  dessert: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=800&q=80&auto=format&fit=crop",
+};
+
+const hasPreferredImage = (value) => {
+  const image = String(value || "").trim();
+  if (!image) return false;
+  if (image.includes("source.unsplash.com")) return false;
+  return true;
+};
+
+const getRelevantImage = (item) => {
+  const haystack = `${item?.title || ""} ${item?.cuisine || ""} ${item?.meal || ""}`.toLowerCase();
+  for (const [keyword, image] of Object.entries(RECIPE_IMAGE_MAP)) {
+    if (haystack.includes(keyword)) {
+      return image;
+    }
+  }
+  return DEFAULT_IMAGE;
+};
+
+const normalizeRecipe = (item) => {
+  const recipe = {
+    id: item.id,
+    title: item.title || "Untitled Recipe",
+    cuisine: item.cuisine || "Fusion",
+    diet: item.diet || "Unknown",
+    time: item.time || "30 minutes",
+    calories: typeof item.calories === "number" ? item.calories : item.calories || "Unknown",
+    difficulty: item.difficulty || "Unknown",
+    meal: item.meal || "Main Course",
+    pantry_match: item.pantry_match ?? null,
+    steps: Array.isArray(item.steps) && item.steps.length
+      ? item.steps
+      : [
+          "Prep ingredients: chop aromatics, measure spices, ready protein/veg.",
+          "Cook base: heat oil, saute aromatics, toast spices until fragrant.",
+          "Build: add mains, simmer/roast until tender and flavors marry.",
+          "Finish: adjust seasoning, garnish, and serve warm.",
+        ],
+    ingredients: item.ingredients && typeof item.ingredients === "object"
+      ? item.ingredients
+      : { available: ["Main produce", "Protein or legumes", "Spice blend", "Oil"], missing: [] },
+    nutrition: item.nutrition && typeof item.nutrition === "object"
+      ? item.nutrition
+      : { protein: 12, carbs: 36, fat: 14, fiber: 5 },
+    health_benefits: Array.isArray(item.health_benefits) ? item.health_benefits : [],
+    similar_dishes: Array.isArray(item.similar_dishes) ? item.similar_dishes : [],
+    food_labels: Array.isArray(item.food_labels) ? item.food_labels : [],
+    cultural: item.cultural || null,
+  };
+
+  recipe.image = hasPreferredImage(item.image) ? item.image : getRelevantImage(recipe);
+  recipe.image_available = hasPreferredImage(item.image);
+  return recipe;
+};
 
 const applyFilters = (list, searchText, cuisine, diet) => {
   const term = searchText.trim().toLowerCase();
@@ -89,17 +152,125 @@ const parseMinutes = (value) => {
   return digits ? Number(digits) : 0;
 };
 
+const dedupeByTitle = (items) => {
+  const seen = new Set();
+  const deduped = [];
+  for (const item of items) {
+    const key = String(item?.title || "").trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(item);
+  }
+  return deduped;
+};
+
+const LOCAL_RECIPES_POOL = dedupeByTitle([...(recipesData || []), ...(allRecipes || [])]);
+
+const splitInstructions = (text) => {
+  const raw = String(text || "").replace(/\r/g, "\n").trim();
+  if (!raw) return [];
+  const byLine = raw.split("\n").map((line) => line.trim()).filter(Boolean);
+  if (byLine.length >= 3) return byLine.slice(0, 12);
+  return raw.split(".").map((part) => part.trim()).filter(Boolean).slice(0, 12);
+};
+
+const mapMealDbToRecipe = (meal) => {
+  const available = [];
+  for (let i = 1; i <= 20; i += 1) {
+    const ingredient = String(meal[`strIngredient${i}`] || "").trim();
+    const measure = String(meal[`strMeasure${i}`] || "").trim();
+    if (!ingredient) continue;
+    available.push(`${measure} ${ingredient}`.trim());
+  }
+
+  const safeId = Number(meal.idMeal);
+  return {
+    id: Number.isFinite(safeId) ? -safeId : -Math.floor(Math.random() * 1000000),
+    title: meal.strMeal || "External Recipe",
+    cuisine: meal.strArea || "External",
+    diet: "Unknown",
+    time: "35 minutes",
+    calories: 380,
+    difficulty: "Medium",
+    meal: meal.strCategory || "Main Course",
+    image: meal.strMealThumb || DEFAULT_IMAGE,
+    pantry_match: null,
+    ingredients: {
+      available: available.length ? available.slice(0, 12) : ["Main ingredient", "Spices", "Oil"],
+      missing: [],
+    },
+    nutrition: { protein: 14, carbs: 40, fat: 14, fiber: 5 },
+    health_benefits: ["Cuisine variety", "Home-cook friendly"],
+    steps: splitInstructions(meal.strInstructions),
+    similar_dishes: [],
+    food_labels: [],
+    cultural: "External recipe sourced from TheMealDB.",
+  };
+};
+
+const fetchExternalRecipes = async ({ searchText, cuisine }) => {
+  const term = String(searchText || "").trim();
+  const cuisineKey = String(cuisine || "").toLowerCase();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 7000);
+
+  try {
+    if (term) {
+      const url = `https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(term)}`;
+      const response = await fetch(url, { signal: controller.signal });
+      const data = await response.json();
+      const meals = Array.isArray(data?.meals) ? data.meals : [];
+      return meals.map(mapMealDbToRecipe);
+    }
+
+    if (cuisine && cuisine !== "All") {
+      const area = CUISINE_AREA_MAP[cuisineKey] || cuisine;
+      const filterUrl = `https://www.themealdb.com/api/json/v1/1/filter.php?a=${encodeURIComponent(area)}`;
+      const response = await fetch(filterUrl, { signal: controller.signal });
+      const data = await response.json();
+      const meals = Array.isArray(data?.meals) ? data.meals.slice(0, 12) : [];
+
+      const detailPromises = meals.map(async (item) => {
+        const idMeal = item?.idMeal;
+        if (!idMeal) return null;
+        try {
+          const detailResp = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${idMeal}`, { signal: controller.signal });
+          const detailData = await detailResp.json();
+          const full = Array.isArray(detailData?.meals) ? detailData.meals[0] : null;
+          return full ? mapMealDbToRecipe(full) : null;
+        } catch {
+          return null;
+        }
+      });
+
+      const detailed = await Promise.all(detailPromises);
+      return detailed.filter(Boolean);
+    }
+
+    return [];
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 const sortRecipes = (list, sortBy, sortOrder) => {
+  const direction = sortOrder === "desc" ? -1 : 1;
   const sorted = [...list].sort((a, b) => {
-    if (sortBy === "title") return (a.title || "").localeCompare(b.title || "");
-    if (sortBy === "cuisine") return (a.cuisine || "").localeCompare(b.cuisine || "");
-    if (sortBy === "calories") return (Number(a.calories) || 0) - (Number(b.calories) || 0);
-    if (sortBy === "time") return parseMinutes(a.time) - parseMinutes(b.time);
-    if (sortBy === "pantry_match") return (Number(a.pantry_match) || 0) - (Number(b.pantry_match) || 0);
-    return (Number(a.id) || 0) - (Number(b.id) || 0);
+    if (a.image_available !== b.image_available) {
+      return a.image_available ? -1 : 1;
+    }
+
+    if (sortBy === "title") return direction * (a.title || "").localeCompare(b.title || "");
+    if (sortBy === "cuisine") return direction * (a.cuisine || "").localeCompare(b.cuisine || "");
+    if (sortBy === "calories") return direction * ((Number(a.calories) || 0) - (Number(b.calories) || 0));
+    if (sortBy === "time") return direction * (parseMinutes(a.time) - parseMinutes(b.time));
+    if (sortBy === "pantry_match") return direction * ((Number(a.pantry_match) || 0) - (Number(b.pantry_match) || 0));
+    return direction * ((Number(a.id) || 0) - (Number(b.id) || 0));
   });
 
-  return sortOrder === "desc" ? sorted.reverse() : sorted;
+  return sorted;
 };
 
 export default function RecipesList() {
@@ -127,6 +298,17 @@ export default function RecipesList() {
   const [favOpen, setFavOpen] = useState(false);
   const favRef = useRef(null);
 
+  const onRecipeImageError = (event, recipe) => {
+    const fallback = getRelevantImage(recipe);
+    if (event.currentTarget.src !== fallback) {
+      event.currentTarget.src = fallback;
+      return;
+    }
+    if (event.currentTarget.src !== DEFAULT_IMAGE) {
+      event.currentTarget.src = DEFAULT_IMAGE;
+    }
+  };
+
   useEffect(() => {
     setPage(1);
   }, [search, activeCuisine, activeDiet, pageSize, sortBy, sortOrder]);
@@ -136,31 +318,23 @@ export default function RecipesList() {
       setLoading(true);
       setActionError("");
       try {
-        const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-        const params = new URLSearchParams();
-        if (search.trim()) params.set("search", search.trim());
-        if (activeCuisine !== "All") params.set("cuisine", activeCuisine);
-        if (activeDiet !== "All") params.set("diet", activeDiet);
-        params.set("page", String(page));
-        params.set("page_size", String(pageSize));
-        params.set("sort_by", sortBy);
-        params.set("sort_order", sortOrder);
+        const localFiltered = applyFilters(LOCAL_RECIPES_POOL, search, activeCuisine, activeDiet);
+        const externalRaw = await fetchExternalRecipes({ searchText: search, cuisine: activeCuisine });
+        const externalFiltered = applyFilters(externalRaw, search, activeCuisine, activeDiet);
 
-        const url = `${API_BASE.replace(/\/$/, "")}/recipes/?${params.toString()}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`Request failed with ${res.status}`);
+        const merged = dedupeByTitle([...localFiltered, ...externalFiltered]).map(normalizeRecipe);
+        const sorted = sortRecipes(merged, sortBy, sortOrder);
+        const total = sorted.length;
+        const pages = Math.max(1, Math.ceil(total / pageSize));
+        const start = (page - 1) * pageSize;
+        const paged = sorted.slice(start, start + pageSize);
 
-        const data = await res.json();
-        const apiItems = Array.isArray(data) ? data : data.items || [];
-        const total = Array.isArray(data) ? apiItems.length : data.total ?? apiItems.length;
-        const pages = Array.isArray(data) ? Math.max(1, Math.ceil(apiItems.length / pageSize)) : data.total_pages ?? 1;
-
-        setRecipes(apiItems.map(normalizeRecipe));
+        setRecipes(paged);
         setTotalCount(total);
         setTotalPages(pages);
       } catch (err) {
-        console.error("Failed to fetch recipes:", err);
-        const local = sortRecipes(applyFilters(allRecipes, search, activeCuisine, activeDiet), sortBy, sortOrder);
+        console.error("Failed to build frontend recipe list:", err);
+        const local = sortRecipes(applyFilters(LOCAL_RECIPES_POOL, search, activeCuisine, activeDiet), sortBy, sortOrder);
         const localTotal = local.length;
         const start = (page - 1) * pageSize;
         const paged = local.slice(start, start + pageSize);
@@ -253,7 +427,7 @@ export default function RecipesList() {
   const openRecipe = (recipe, index) => {
     navigate(`/recipe/${recipe.id}`, {
       state: {
-        recipe,
+        ...(recipe.id < 0 ? { recipe } : {}),
         listContext: {
           recipes,
           currentIndex: index,
@@ -328,7 +502,12 @@ export default function RecipesList() {
                 <ul className="rl-fav-list">
                   {favRecipes.map((r) => (
                     <li key={r.id} className="rl-fav-item">
-                      <img src={r.image} alt={r.title} className="rl-fav-item-img" />
+                      <img
+                        src={r.image}
+                        alt={r.title}
+                        className="rl-fav-item-img"
+                        onError={(event) => onRecipeImageError(event, r)}
+                      />
                       <div className="rl-fav-item-info">
                         <span className="rl-fav-item-title">{r.title}</span>
                         <span className="rl-fav-item-cuisine">{r.cuisine} · {r.time}</span>
@@ -423,7 +602,12 @@ export default function RecipesList() {
               style={{ cursor: "pointer" }}
             >
               <div className="rl-card-img-wrap">
-                <img src={r.image} alt={r.title} className="rl-card-img" />
+                <img
+                  src={r.image}
+                  alt={r.title}
+                  className="rl-card-img"
+                  onError={(event) => onRecipeImageError(event, r)}
+                />
                 <span className="rl-cuisine-badge">{r.cuisine}</span>
                 <button
                   className={`rl-fav-btn${favorites.includes(r.id) ? " active" : ""}`}

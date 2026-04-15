@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "../styles/HealthGuide.css";
 import ProfileDropdown from "../components/ProfileDropdown";
+import localRecipes from "../data/recipes";
 
 const nutrients = [
   {
@@ -162,6 +163,418 @@ const concernArticles = [
   },
 ];
 
+const normalizeText = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9\s-]+/g, " ");
+
+const uniqueBy = (items, keyGetter) => {
+  const seen = new Set();
+  return items.filter((item) => {
+    const key = keyGetter(item);
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+};
+
+const healthConcernProfiles = [
+  {
+    key: "diabetes",
+    label: "Blood Sugar Balance",
+    keywords: ["diabetes", "diabetic", "blood sugar", "insulin", "glucose", "a1c", "sugar control"],
+    benefits: [
+      { title: "Steadier blood sugar", detail: "Fiber-rich foods slow digestion and reduce post-meal glucose spikes." },
+      { title: "Longer satiety", detail: "Protein and healthy fats help reduce cravings and keep energy more stable." },
+      { title: "Cleaner energy curve", detail: "Balanced meals reduce crashes and make the day feel more predictable." },
+    ],
+    foods: [
+      { name: "Lentils and beans", reason: "slow-digesting carbs plus fiber help flatten glucose spikes", usage: "Use in dals, soups, salads, or wraps" },
+      { name: "Non-starchy vegetables", reason: "high volume and low glycemic load support balanced meals", usage: "Build half of the plate with spinach, broccoli, cucumber, and peppers" },
+      { name: "Nuts and seeds", reason: "healthy fats and protein slow carb absorption", usage: "Add a small handful to snacks, yogurt, or salads" },
+      { name: "Plain yogurt", reason: "protein-rich and easy to pair with fiber for a gentler glucose response", usage: "Choose unsweetened yogurt with chia, nuts, or berries" },
+    ],
+    avoid: ["Sugary drinks", "Refined flour snacks", "Large white rice portions", "Desserts on an empty stomach"],
+    tips: [
+      "Pair carbohydrates with protein and fiber instead of eating them alone.",
+      "Choose smaller portions of rice, roti, or bread and add more vegetables.",
+      "Keep a consistent meal rhythm to avoid large glucose swings.",
+    ],
+    recipeTags: ["diabetic friendly", "high fiber", "low carb"],
+  },
+  {
+    key: "heart",
+    label: "Heart Health",
+    keywords: ["heart", "cardio", "cardiovascular", "cholesterol", "bp", "blood pressure", "hypertension"],
+    benefits: [
+      { title: "Better cholesterol balance", detail: "Fiber and unsaturated fats can help support healthier lipid levels." },
+      { title: "Lower blood pressure load", detail: "Food choices lower in sodium and rich in potassium support circulation." },
+      { title: "Less inflammation pressure", detail: "Antioxidant-rich meals support the heart and blood vessels." },
+    ],
+    foods: [
+      { name: "Oats and whole grains", reason: "soluble fiber supports cholesterol control", usage: "Use as breakfast bowls or grain bases" },
+      { name: "Olive oil and avocado", reason: "unsaturated fats support heart-friendly meal patterns", usage: "Use in dressings, dips, and light cooking" },
+      { name: "Fatty fish", reason: "omega-3 fats support cardiovascular health", usage: "Choose grilled or baked fish a few times per week" },
+      { name: "Leafy greens", reason: "rich in potassium, folate, and antioxidants", usage: "Add to salads, curries, smoothies, or sautés" },
+    ],
+    avoid: ["Deep fried snacks", "Heavy cream sauces", "Excess salt", "Processed meats"],
+    tips: [
+      "Prefer grilled, steamed, roasted, or lightly sautéed cooking methods.",
+      "Use herbs, lemon, garlic, and spices for flavor instead of excess salt.",
+      "Aim for regular movement and good sleep alongside heart-friendly meals.",
+    ],
+    recipeTags: ["heart healthy", "low carb", "high fiber"],
+  },
+  {
+    key: "weight",
+    label: "Weight Management",
+    keywords: ["weight loss", "fat loss", "obesity", "overweight", "weight management", "lean"],
+    benefits: [
+      { title: "Better fullness", detail: "Protein and fiber reduce hunger between meals." },
+      { title: "Lower calorie density", detail: "Vegetable-rich meals provide volume without excess calories." },
+      { title: "More steady routines", detail: "Simple, predictable meals make portion control easier to maintain." },
+    ],
+    foods: [
+      { name: "Vegetables", reason: "high volume and low calorie density support satiety", usage: "Load up salads, stir-fries, soups, and curries" },
+      { name: "Lean protein", reason: "helps preserve muscle while improving fullness", usage: "Use eggs, tofu, paneer, fish, or chicken as the meal anchor" },
+      { name: "Whole grains", reason: "provide fiber and longer-lasting energy than refined flour", usage: "Choose smaller portions of brown rice, oats, or quinoa" },
+      { name: "Fruit", reason: "sweetness with fiber is better than added sugar desserts", usage: "Choose whole fruit instead of juice when possible" },
+    ],
+    avoid: ["Sugary drinks", "Large fried portions", "Desserts", "Frequent ultra-processed snacks"],
+    tips: [
+      "Build meals around protein first, then add vegetables and a measured starch portion.",
+      "Keep snacks simple and planned instead of grazing all day.",
+      "Focus on consistency instead of extreme restriction.",
+    ],
+    recipeTags: ["low calorie", "high fiber", "high protein"],
+  },
+  {
+    key: "muscle",
+    label: "Muscle Gain",
+    keywords: ["muscle gain", "muscle", "bodybuilding", "strength", "high protein", "bulking"],
+    benefits: [
+      { title: "More muscle repair", detail: "Enough protein and recovery foods support tissue rebuilding." },
+      { title: "Better training energy", detail: "Carbohydrates provide fuel for workouts and recovery." },
+      { title: "Improved satiety", detail: "Protein-dense meals can reduce random snacking and improve meal quality." },
+    ],
+    foods: [
+      { name: "Eggs and paneer", reason: "dense protein for muscle repair", usage: "Use in breakfast dishes, bowls, and quick curries" },
+      { name: "Greek yogurt", reason: "protein-rich and convenient around training", usage: "Pair with fruit, seeds, or oats" },
+      { name: "Lentils and chickpeas", reason: "plant protein plus carbs for training support", usage: "Add to stews, wraps, and grain bowls" },
+      { name: "Rice, oats, or potatoes", reason: "fuel training and help refill glycogen", usage: "Balance with protein and vegetables" },
+    ],
+    avoid: ["Skipping meals", "Very low carb plans during heavy training", "Empty-calorie snacks", "Under-eating protein"],
+    tips: [
+      "Split protein across the day instead of eating it all in one meal.",
+      "Include a carb source after training to support recovery.",
+      "Prioritize sleep because muscle growth happens during recovery, not just workouts.",
+    ],
+    recipeTags: ["high protein", "protein snack"],
+  },
+  {
+    key: "digestion",
+    label: "Digestion and Acidity",
+    keywords: ["acidity", "acid reflux", "gerd", "heartburn", "indigestion", "constipation", "bloating"],
+    benefits: [
+      { title: "Less reflux pressure", detail: "Smaller, lighter meals can reduce the chance of irritation." },
+      { title: "Smoother digestion", detail: "Fiber and hydration support regular bowel movements." },
+      { title: "More comfortable meals", detail: "Gentler spices and simpler preparations are easier on the stomach." },
+    ],
+    foods: [
+      { name: "Oats", reason: "soft fiber can be gentle and filling", usage: "Use for breakfast or light meals" },
+      { name: "Bananas", reason: "easy-to-digest fruit for many people", usage: "Pair with yogurt or oats" },
+      { name: "Cooked vegetables", reason: "softer texture is usually easier to tolerate than raw heavy meals", usage: "Prefer steamed or sautéed dishes" },
+      { name: "Ginger and fennel", reason: "often used in soothing meals and teas", usage: "Add carefully to warm drinks or food" },
+    ],
+    avoid: ["Very spicy food", "Large oily meals", "Late-night heavy eating", "Excess caffeine"],
+    tips: [
+      "Eat smaller meals and avoid lying down right after eating.",
+      "Keep dinner earlier and lighter when reflux is a concern.",
+      "Track trigger foods because tolerance varies from person to person.",
+    ],
+    recipeTags: ["light meal", "low fat", "comforting"],
+  },
+  {
+    key: "bone",
+    label: "Bone Strength",
+    keywords: ["bone", "calcium", "osteoporosis", "vitamin d", "joints", "bone health"],
+    benefits: [
+      { title: "Stronger bones", detail: "Calcium and vitamin D support bone density and remodeling." },
+      { title: "Better muscle function", detail: "Mineral balance helps muscles contract normally." },
+      { title: "Long-term protection", detail: "Adequate nutrition now helps lower bone loss risk later." },
+    ],
+    foods: [
+      { name: "Yogurt and milk", reason: "reliable calcium sources for many meal plans", usage: "Use in breakfast bowls, drinks, or snacks" },
+      { name: "Leafy greens", reason: "support calcium and micronutrient intake", usage: "Add to curries, soups, and salads" },
+      { name: "Eggs and mushrooms", reason: "support vitamin D intake patterns", usage: "Use in breakfast or savory meals" },
+      { name: "Fortified foods", reason: "help close calcium or vitamin D gaps", usage: "Check labels on plant milks and cereals" },
+    ],
+    avoid: ["Skipping calcium-rich foods", "Very low protein diets", "Too much soda", "Highly processed snack patterns"],
+    tips: [
+      "Combine calcium-rich foods with regular movement or weight-bearing exercise.",
+      "Pay attention to vitamin D because calcium works best when vitamin D is adequate.",
+      "Include protein to support bone structure as well as muscle.",
+    ],
+    recipeTags: ["calcium rich", "bone health", "high protein"],
+  },
+  {
+    key: "immunity",
+    label: "Immunity and Recovery",
+    keywords: ["immunity", "immune", "cold", "fever", "recovery", "infection"],
+    benefits: [
+      { title: "Better nutrient coverage", detail: "Vitamin-rich meals give the immune system the building blocks it needs." },
+      { title: "Faster recovery support", detail: "Protein and fluids help the body repair and bounce back." },
+      { title: "Lower inflammation load", detail: "Antioxidant-rich foods can support a healthier recovery pattern." },
+    ],
+    foods: [
+      { name: "Citrus fruits", reason: "vitamin C is useful for immune-supportive eating patterns", usage: "Eat whole fruit or add to salads" },
+      { name: "Garlic and ginger", reason: "common flavor builders in recovery-focused meals", usage: "Use in soups, broths, and teas" },
+      { name: "Leafy greens", reason: "provide folate, vitamin C, and other micronutrients", usage: "Use in cooked or blended dishes" },
+      { name: "Protein foods", reason: "the immune system still needs amino acids for repair", usage: "Include eggs, tofu, chicken, paneer, or legumes" },
+    ],
+    avoid: ["Excess alcohol", "Very sugary drinks", "Skipping meals", "Too little fluid"],
+    tips: [
+      "Hydration matters as much as food choice when recovery is the goal.",
+      "Use simple, nourishing meals when appetite is low.",
+      "Sleep and stress management strongly influence recovery.",
+    ],
+    recipeTags: ["vitamin rich", "high protein"],
+  },
+  {
+    key: "hormonal",
+    label: "Hormonal Balance",
+    keywords: ["pcos", "pcod", "thyroid", "hormone", "hormonal", "cycle", "metabolism"],
+    benefits: [
+      { title: "More stable metabolism", detail: "Regular balanced meals help the body avoid energy crashes." },
+      { title: "Better blood sugar rhythm", detail: "Fiber and protein can help with insulin sensitivity-focused meal patterns." },
+      { title: "Steadier mood and appetite", detail: "Protein and healthy fats can reduce intense hunger swings." },
+    ],
+    foods: [
+      { name: "High fiber foods", reason: "help with meal stability and satiety", usage: "Use vegetables, legumes, fruit, and whole grains" },
+      { name: "Lean protein", reason: "supports hormone-friendly meal patterns", usage: "Make protein part of every main meal" },
+      { name: "Healthy fats", reason: "help absorb fat-soluble nutrients and support fullness", usage: "Use nuts, seeds, avocado, or olive oil" },
+      { name: "Iron-rich foods", reason: "help when fatigue is part of the picture", usage: "Use spinach, lentils, tofu, or fortified options" },
+    ],
+    avoid: ["Highly refined sweets", "Irregular meal skipping", "Very low protein eating", "Large fried meals"],
+    tips: [
+      "Keep meals regular and protein-forward.",
+      "Use a balanced plate instead of relying on one food group.",
+      "If thyroid symptoms are suspected, follow up with a clinician for testing and treatment advice.",
+    ],
+    recipeTags: ["plant protein", "high fiber", "high protein"],
+  },
+  {
+    key: "plantBased",
+    label: "Plant-Based Balance",
+    keywords: ["vegan", "vegetarian", "plant based", "plant-based", "meatless"],
+    benefits: [
+      { title: "More fiber", detail: "Plant-forward meals naturally increase fiber, which supports digestion and fullness." },
+      { title: "Better micronutrient variety", detail: "A wider plant mix improves vitamin, mineral, and antioxidant coverage." },
+      { title: "Flexible protein pairing", detail: "Legumes, soy, grains, and dairy alternatives can be combined to cover protein needs." },
+    ],
+    foods: [
+      { name: "Lentils and chickpeas", reason: "foundation proteins for plant-based plates", usage: "Use in curries, bowls, soups, and wraps" },
+      { name: "Tofu and soy foods", reason: "versatile protein sources with a neutral flavor base", usage: "Stir-fry, grill, or crumble into fillings" },
+      { name: "Whole grains", reason: "pair well with legumes for a balanced amino acid profile", usage: "Use brown rice, quinoa, oats, or whole wheat" },
+      { name: "Seeds and nuts", reason: "provide healthy fats and extra calories when needed", usage: "Add to salads, breakfasts, and snacks" },
+    ],
+    avoid: ["Relying only on refined carbs", "Skipping protein at meals", "Very repetitive one-food plans"],
+    tips: [
+      "Combine legumes with grains for a more complete protein profile.",
+      "If using plant milks or yogurts, choose fortified options when possible.",
+      "Watch iron, B12, calcium, and vitamin D if you are fully plant-based.",
+    ],
+    recipeTags: ["plant protein", "high fiber", "low calorie"],
+  },
+];
+
+const generalWellnessProfile = {
+  key: "general-wellness",
+  label: "General Wellness",
+  benefits: [
+    { title: "Steady energy", detail: "Balanced meals with protein, fiber, and healthy fats help avoid energy crashes." },
+    { title: "Better nutrient coverage", detail: "A varied plate makes it easier to cover vitamins, minerals, and protein." },
+    { title: "Easier meal planning", detail: "Simple meal structure makes healthy choices more repeatable." },
+  ],
+  foods: [
+    { name: "Vegetables", reason: "provide fiber and micronutrients", usage: "Use in every lunch or dinner" },
+    { name: "Protein foods", reason: "support fullness and tissue repair", usage: "Include eggs, dairy, tofu, fish, legumes, or lean meats" },
+    { name: "Whole grains", reason: "offer longer-lasting energy than refined options", usage: "Choose oats, brown rice, or whole wheat in modest portions" },
+    { name: "Fruit", reason: "adds sweetness with fiber and antioxidants", usage: "Use whole fruit for snacks and desserts" },
+  ],
+  avoid: ["Skipping meals", "Sugary drinks", "Ultra-processed snacks"],
+  tips: [
+    "Start with one or two realistic changes instead of overhauling everything at once.",
+    "Use a simple plate rule: protein, vegetables, and a measured carb portion.",
+    "Hydration and sleep improve how any food plan feels day to day.",
+  ],
+  recipeTags: ["high protein", "high fiber", "low calorie"],
+};
+
+const dietGoalToConcernKeys = {
+  "weight loss": ["weight"],
+  "muscle gain": ["muscle"],
+  "diabetic friendly": ["diabetes"],
+  "heart healthy": ["heart"],
+  "high protein": ["muscle"],
+  vegan: ["plantBased"],
+  vegetarian: ["plantBased"],
+};
+
+const buildLocalHealthPlan = (plannerForm) => {
+  const inputText = normalizeText([
+    plannerForm.healthIssues,
+    plannerForm.dietGoal,
+    plannerForm.mealType,
+    plannerForm.preferences,
+    plannerForm.avoidIngredients,
+  ].filter(Boolean).join(" "));
+
+  const explicitMatches = healthConcernProfiles.filter((profile) =>
+    profile.keywords.some((keyword) => inputText.includes(normalizeText(keyword))),
+  );
+
+  const goalMatches = (dietGoalToConcernKeys[plannerForm.dietGoal] || [])
+    .map((key) => healthConcernProfiles.find((profile) => profile.key === key))
+    .filter(Boolean);
+
+  const matchedProfiles = uniqueBy([...explicitMatches, ...goalMatches], (profile) => profile.key);
+  const activeProfiles = matchedProfiles.length ? matchedProfiles : [generalWellnessProfile];
+
+  const relevantBenefits = uniqueBy(
+    activeProfiles.flatMap((profile) => profile.benefits.map((benefit) => ({ ...benefit, source: profile.label }))),
+    (benefit) => benefit.title,
+  );
+
+  const recommendedFoods = uniqueBy(
+    activeProfiles.flatMap((profile) => profile.foods.map((food) => ({ ...food, source: profile.label }))),
+    (food) => food.name,
+  );
+
+  const avoidFoods = uniqueBy(
+    [
+      ...activeProfiles.flatMap((profile) => profile.avoid),
+      ...String(plannerForm.avoidIngredients || "").split(/[,/;\n]+/).map((item) => item.trim()).filter(Boolean),
+    ],
+    (item) => item.toLowerCase(),
+  );
+
+  const lifestyleTips = uniqueBy(
+    [
+      ...activeProfiles.flatMap((profile) => profile.tips),
+      "Drink enough water and keep meals consistent through the day.",
+    ],
+    (tip) => tip.toLowerCase(),
+  );
+
+  const matchedLabels = activeProfiles.map((profile) => profile.label);
+  const concernSummary = matchedLabels.length
+    ? `Your plan is tailored for ${matchedLabels.join(", ")}.`
+    : "Your plan is tailored for general wellness.";
+
+  const maxPrepTime = plannerForm.maxPrepTime ? Number(plannerForm.maxPrepTime) : null;
+  const avoidText = normalizeText(avoidFoods.join(" "));
+
+  const scoredRecipes = localRecipes
+    .map((recipe) => {
+      const recipeText = normalizeText([
+        recipe.title,
+        recipe.cuisine,
+        recipe.diet,
+        recipe.meal,
+        recipe.healthBenefits?.join(" "),
+        recipe.similarDishes?.join(" "),
+        recipe.ingredients?.available?.join(" "),
+        recipe.ingredients?.missing?.join(" "),
+      ].filter(Boolean).join(" "));
+
+      let score = 0;
+      const reasons = [];
+      const lowerHealthBenefits = (recipe.healthBenefits || []).map((benefit) => normalizeText(benefit));
+
+      activeProfiles.forEach((profile) => {
+        const matchedTag = profile.recipeTags.find((tag) => lowerHealthBenefits.some((benefit) => benefit.includes(normalizeText(tag))))
+          || profile.keywords.find((keyword) => recipeText.includes(normalizeText(keyword)));
+        if (matchedTag) {
+          score += 3;
+          reasons.push(`${profile.label} match`);
+        }
+      });
+
+      if (plannerForm.dietGoal) {
+        const dietGoal = normalizeText(plannerForm.dietGoal);
+        if (normalizeText(recipe.diet).includes(dietGoal) || lowerHealthBenefits.some((benefit) => benefit.includes(dietGoal))) {
+          score += 2;
+          reasons.push(`Matches ${plannerForm.dietGoal}`);
+        }
+      }
+
+      if (plannerForm.mealType && normalizeText(recipe.meal).includes(normalizeText(plannerForm.mealType))) {
+        score += 1;
+        reasons.push(`Good for ${plannerForm.mealType}`);
+      }
+
+      if (maxPrepTime && recipe.time) {
+        const minutes = Number(String(recipe.time).match(/\d+/)?.[0] || 0);
+        if (minutes && minutes <= maxPrepTime) {
+          score += 1;
+          reasons.push(`Fits your ${maxPrepTime}-minute cap`);
+        }
+      }
+
+      if (plannerForm.preferences) {
+        const prefs = normalizeText(plannerForm.preferences);
+        if (prefs.includes("quick") && normalizeText(recipe.time).includes("minute")) {
+          score += 1;
+          reasons.push("Quick to prepare");
+        }
+        if (prefs.includes("low oil") && lowerHealthBenefits.some((benefit) => benefit.includes("low fat") || benefit.includes("low calorie"))) {
+          score += 1;
+          reasons.push("Works for a lighter cooking style");
+        }
+      }
+
+      if (avoidText && recipeText.includes(avoidText)) {
+        score -= 5;
+      }
+
+      return {
+        ...recipe,
+        reason: reasons.length ? uniqueBy(reasons, (item) => item.toLowerCase()).join(" • ") : "Balanced local option from the embedded recipe library.",
+        score,
+      };
+    })
+    .filter((recipe) => recipe.score > 0 || matchedLabels.length === 0)
+    .sort((left, right) => right.score - left.score || left.calories - right.calories)
+    .slice(0, 5)
+    .map((recipe) => ({
+      id: recipe.id,
+      title: recipe.title,
+      image: recipe.image,
+      meal: recipe.meal,
+      time: recipe.time,
+      diet: recipe.diet,
+      steps: recipe.steps || [],
+      healthBenefits: recipe.healthBenefits || [],
+      reason: recipe.reason,
+    }));
+
+  const summary = [
+    concernSummary,
+    relevantBenefits.slice(0, 3).map((benefit) => benefit.title).join(", "),
+  ].filter(Boolean).join(" ");
+
+  return {
+    summary,
+    matched_concerns: matchedLabels,
+    relevant_health_benefits: relevantBenefits,
+    recommended_foods: recommendedFoods,
+    avoid_foods: avoidFoods,
+    recipes: scoredRecipes,
+    lifestyle_tips: lifestyleTips,
+    disclaimer: "This guidance is educational and generated entirely in your browser from the local nutrition library. For medical decisions or persistent symptoms, consult a qualified clinician.",
+  };
+};
+
 const collectRelatedArticles = (plannerForm, plannerResult) => {
   if (!plannerResult) {
     return [];
@@ -171,7 +584,8 @@ const collectRelatedArticles = (plannerForm, plannerResult) => {
     plannerForm.healthIssues,
     plannerForm.dietGoal,
     plannerForm.preferences,
-    plannerResult.summary,
+    plannerResult?.summary,
+    plannerResult?.matched_concerns?.join(" "),
   ]
     .filter(Boolean)
     .join(" ")
@@ -181,9 +595,7 @@ const collectRelatedArticles = (plannerForm, plannerResult) => {
     article.keywords.some((keyword) => combinedText.includes(keyword)),
   );
 
-  const fallback = matched.length ? matched : concernArticles.slice(0, 3);
-
-  return fallback.slice(0, 4);
+  return uniqueBy([...(matched.length ? matched : concernArticles.slice(0, 4))], (article) => article.key);
 };
 
 // Mock analysis: randomly picks 2-4 "missing" nutrients to simulate detection
@@ -306,66 +718,9 @@ function HealthGuide() {
     setPlannerLoading(true);
     setPlannerError("");
     setPlannerResult(null);
-
-    // Use Vite env var if provided, otherwise default to localhost:8000
-    const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-    const url = `${API_BASE.replace(/\/$/, "")}/health-plan/recommendations`;
-
-    // Backend expects HealthPlanRequest schema (snake_case): arrays for health_issues and avoid_ingredients
-    const payload = {
-      health_issues: (plannerForm.healthIssues || "")
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-      diet_goal: plannerForm.dietGoal || null,
-      meal_type: plannerForm.mealType || null,
-      preferences: plannerForm.preferences || null,
-      avoid_ingredients: (plannerForm.avoidIngredients || "")
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-      max_prep_time: plannerForm.maxPrepTime ? Number(plannerForm.maxPrepTime) : null,
-    };
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
-
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      // Network-level OK but server may return non-2xx JSON error
-      const text = await res.text();
-      let data = null;
-      try {
-        data = text ? JSON.parse(text) : null;
-      } catch (err) {
-        throw new Error("Invalid JSON response from server.");
-      }
-
-      if (!res.ok) {
-        const message = (data && (data.detail || data.error || data.message)) || `Server responded with ${res.status}`;
-        throw new Error(message);
-      }
-
-      // Expect `data` to contain a `recipes` array for rendering
-      setPlannerResult(data);
-    } catch (err) {
-      if (err.name === "AbortError") {
-        setPlannerError("Request timed out. Please try again.");
-      } else {
-        setPlannerError(err.message || "Failed to fetch recipes.");
-      }
-    } finally {
-      clearTimeout(timeout);
-      setPlannerLoading(false);
-    }
+    const data = buildLocalHealthPlan(plannerForm);
+    setPlannerResult(data);
+    setPlannerLoading(false);
   };
 
   return (
@@ -406,7 +761,7 @@ function HealthGuide() {
         <div className="hg-plan-card">
           <h2 className="hg-plan-title">Health & Diet Planner</h2>
           <p className="hg-plan-subtitle">
-            Tell us your health issues or diet goal and get food recommendations with recipes you can cook now.
+            Tell us your health concern or diet goal and get a fully local plan with health benefits, foods to emphasize, and recipes from the built-in library.
           </p>
 
           <form className="hg-plan-form" onSubmit={submitHealthPlanner}>
@@ -482,7 +837,7 @@ function HealthGuide() {
             </label>
 
             <button className="hg-plan-submit" disabled={plannerLoading}>
-              {plannerLoading ? "Generating Plan..." : "Get My Food & Recipe Plan"}
+              {plannerLoading ? "Building Plan..." : "Build My Health Plan"}
             </button>
           </form>
 
@@ -498,7 +853,31 @@ function HealthGuide() {
 
           {plannerResult && (
             <div className="hg-plan-result">
-              <p className="hg-plan-summary">{plannerResult.summary}</p>
+              <div className="hg-plan-summary-block">
+                <p className="hg-plan-summary">{plannerResult.summary}</p>
+                {plannerResult.matched_concerns?.length > 0 && (
+                  <div className="hg-plan-chip-row">
+                    {plannerResult.matched_concerns.map((concern) => (
+                      <span key={concern} className="hg-plan-chip">{concern}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {plannerResult.relevant_health_benefits?.length > 0 && (
+                <div className="hg-plan-benefit-section">
+                  <h3>Relevant Health Benefits</h3>
+                  <div className="hg-plan-benefit-grid">
+                    {plannerResult.relevant_health_benefits.map((benefit) => (
+                      <div key={benefit.title} className="hg-plan-benefit-card">
+                        <p className="hg-plan-benefit-title">{benefit.title}</p>
+                        <p className="hg-plan-benefit-detail">{benefit.detail}</p>
+                        <span className="hg-plan-benefit-source">Source: {benefit.source}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="hg-plan-grid">
                 <div className="hg-plan-foods">
@@ -506,6 +885,7 @@ function HealthGuide() {
                   {plannerResult.recommended_foods.map((food, index) => (
                     <div key={index} className="hg-plan-food-card">
                       <p className="hg-plan-food-name">{food.name}</p>
+                      <p className="hg-plan-food-source">Source: {food.source}</p>
                       <p className="hg-plan-food-reason">{food.reason}</p>
                       <p className="hg-plan-food-usage">How to use: {food.usage}</p>
                     </div>
@@ -535,6 +915,14 @@ function HealthGuide() {
                       <div className="hg-plan-recipe-body">
                         <p className="hg-plan-recipe-title">{recipe.title}</p>
                         <p className="hg-plan-recipe-meta">{recipe.meal} • {recipe.time} • {recipe.diet}</p>
+                        <p className="hg-plan-recipe-reason">{recipe.reason}</p>
+                        {Array.isArray(recipe.healthBenefits) && recipe.healthBenefits.length > 0 && (
+                          <div className="hg-plan-recipe-tags">
+                            {recipe.healthBenefits.map((benefit) => (
+                              <span key={benefit} className="hg-plan-recipe-tag">{benefit}</span>
+                            ))}
+                          </div>
+                        )}
                         {Array.isArray(recipe.steps) && recipe.steps.length > 0 && (
                           <p className="hg-plan-recipe-step">First step: {recipe.steps[0]}</p>
                         )}

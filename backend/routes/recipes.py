@@ -3,21 +3,12 @@ from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import Optional
 import requests
-<<<<<<< HEAD
-from database import get_db
-from models import Recipe
-from schemas import RecipeOut, RecipeCreate, RecipeUpdate, RecipeListResponse
-from clarifai_service import search_concepts_for_text
-from rag_service import build_index_from_recipes, save_index
-from tasks import enqueue_reindex, get_job_status
-=======
 from ..database import get_db
 from ..models import Recipe
-from ..schemas import RecipeOut
+from ..schemas import RecipeOut, RecipeCreate, RecipeUpdate, RecipeListResponse
 from ..clarifai_service import search_concepts_for_text
 from ..rag_service import build_index_from_recipes, save_index
 from ..tasks import enqueue_reindex, get_job_status
->>>>>>> 0ba329a9dcb010f5d8639fc47b8551cd3e264e61
 
 router = APIRouter(prefix="/recipes", tags=["Recipes"])
 VIRTUAL_RECIPES_CACHE: dict[int, RecipeOut] = {}
@@ -513,16 +504,13 @@ def get_all_recipes(
         search = search.strip().lower()
         query = query.filter(Recipe.title.ilike(f"%{search}%"))
 
-<<<<<<< HEAD
-    results = list(query.all())
-=======
     # Execute DB query once and ensure `local_results` is always defined
     try:
         local_results = query.all()
     except Exception as e:
         print(f"DB query failed in get_all_recipes: {e}")
         local_results = []
->>>>>>> 0ba329a9dcb010f5d8639fc47b8551cd3e264e61
+    results = list(local_results)
 
     if search:
         # Always also fetch from TheMealDB when searching
@@ -619,7 +607,7 @@ def regenerate_recipe(recipe_id: int, db: Session = Depends(get_db)):
 
     regenerated_data = _build_regenerated_recipe_payload(recipe)
     try:
-        from llm_service import generate_recipe
+        from ..llm_service import generate_recipe
 
         prompt = (
             "Rewrite the following recipe as a fresh variation. "

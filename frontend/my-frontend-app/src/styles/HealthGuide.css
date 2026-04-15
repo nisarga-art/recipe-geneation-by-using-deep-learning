@@ -219,10 +219,79 @@
   border-top: 1px solid #f0f0f0;
 }
 
+.hg-plan-summary-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
 .hg-plan-summary {
   margin: 0 0 14px;
   color: #374151;
   font-weight: 600;
+}
+
+.hg-plan-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hg-plan-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #fff4ed;
+  color: #c2410c;
+  border: 1px solid #ffd8bd;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.hg-plan-benefit-section {
+  margin-bottom: 18px;
+}
+
+.hg-plan-benefit-section h3 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  color: #111827;
+}
+
+.hg-plan-benefit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.hg-plan-benefit-card {
+  background: linear-gradient(180deg, #fffaf5 0%, #fff 100%);
+  border: 1px solid #ffe2cb;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.hg-plan-benefit-title {
+  margin: 0;
+  font-weight: 700;
+  color: #111827;
+}
+
+.hg-plan-benefit-detail {
+  margin: 8px 0 0;
+  color: #4b5563;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.hg-plan-benefit-source {
+  display: inline-block;
+  margin-top: 10px;
+  color: #9a3412;
+  font-size: 0.76rem;
+  font-weight: 700;
 }
 
 .hg-plan-grid {
@@ -252,6 +321,13 @@
   margin: 0;
   font-weight: 700;
   color: #111827;
+}
+
+.hg-plan-food-source {
+  margin: 4px 0 0;
+  color: #9a3412;
+  font-size: 0.76rem;
+  font-weight: 700;
 }
 
 .hg-plan-food-reason,
@@ -314,11 +390,36 @@
   color: #111827;
 }
 
+.hg-plan-recipe-reason {
+  margin: 6px 0 0;
+  color: #4b5563;
+  font-size: 0.82rem;
+}
+
 .hg-plan-recipe-meta,
 .hg-plan-recipe-step {
   margin: 6px 0 0;
   color: #6b7280;
   font-size: 0.82rem;
+}
+
+.hg-plan-recipe-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.hg-plan-recipe-tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: #f8fafc;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+  font-size: 0.74rem;
+  font-weight: 700;
 }
 
 .hg-plan-recipe-body button {
