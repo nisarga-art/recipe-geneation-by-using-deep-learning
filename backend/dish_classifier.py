@@ -34,7 +34,8 @@ def load_model():
     if _MODEL is not None and _CLASSES is not None:
         return _MODEL
 
-    if not _MODEL_PATH.exists() or not __CLASSES_PATH.exists():
+    # ensure model and classes files exist
+    if not _MODEL_PATH.exists() or not _CLASSES_PATH.exists():
         _MODEL = None
         _CLASSES = None
         return None
@@ -54,7 +55,9 @@ def load_model():
         model.eval()
         _MODEL = model
 
-    except Exception:
+    except Exception as e:
+        # keep failures quiet but helpful in logs
+        print(f"Failed to load classifier model: {e}")
         _MODEL = None
         _CLASSES = None
 
