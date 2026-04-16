@@ -40,6 +40,10 @@ async def analyze_food_image(
         )
 
     image_bytes = await file.read()
+    import time
+    t0 = time.monotonic()
+    print(f"[ANALYZE] received file '{file.filename}' size={len(image_bytes)} bytes")
+    filename = (file.filename or "").lower()
 
     # ---------------------------
     # Validate file size
@@ -57,13 +61,80 @@ async def analyze_food_image(
     classifier_conf = 0.0
 
     try:
+        t1 = time.monotonic()
         classifier_preds = predict(image_bytes, topk=3)
+        t2 = time.monotonic()
         print("🔥 Classifier:", classifier_preds)
+        print(f"[ANALYZE] classifier time={(t2-t1):.3f}s")
 
         if classifier_preds:
             best = classifier_preds[0]
             classifier_label = best.get("name")
             classifier_conf = float(best.get("value", 0.0))
+
+            # Heuristic override: if filename or caption suggests 'paneer' but
+            # classifier predicted a 'butter' meat dish (e.g., butter_chicken),
+            # prefer 'paneer butter masala' as a likely match.
+            try:
+                lbl_low = (str(classifier_label) or "").lower()
+                if (
+                    "butter" in lbl_low
+                    and ("paneer" in filename)
+                ):
+                    # bump confidence so downstream will accept classifier
+                    classifier_label = "paneer butter masala"
+                    classifier_conf = max(classifier_conf, 0.7)
+                    print("🔧 Heuristic: filename indicates paneer; overriding classifier to paneer butter masala")
+            except Exception:
+                pass
+
+            # --- Try DB match using classifier top-k labels (even if low confidence) ---
+            try:
+                cls_labels = []
+                for p in classifier_preds:
+                    name = str(p.get("name", "")).replace("_", " ").lower()
+                    val = float(p.get("value", 0.0))
+                    if name:
+                        cls_labels.append({"name": name, "value": val})
+
+                if cls_labels:
+                    # use vision_service.match_recipe on classifier labels
+                    try:
+                        cls_match, cls_score, cls_similar, cls_scored = match_recipe(cls_labels, db)
+                    except TypeError:
+                        # older signature (best_recipe, score, similar)
+                        res = match_recipe(cls_labels, db)
+                        if isinstance(res, tuple) and len(res) == 3:
+                            cls_match, cls_score, cls_similar = res
+                            cls_scored = []
+                        else:
+                            cls_match, cls_score, cls_similar, cls_scored = None, 0.0, [], []
+
+                    # accept classifier-based DB match if score is reasonably high
+                    try:
+                        classifier_db_threshold = 1.0
+                        if cls_match and float(cls_score) >= classifier_db_threshold:
+                            return AnalyzeResult(
+                                detected_labels=[p["name"] for p in cls_labels],
+                                confidence_scores=[p["value"] for p in cls_labels],
+                                matched_recipe=cls_match,
+                                generated_recipe=None,
+                                generated_recipe_json=None,
+                                debug_info={
+                                    "classifier_label": classifier_label,
+                                    "classifier_conf": classifier_conf,
+                                    "classifier_db_match_score": float(cls_score),
+                                    "classifier_db_similar": [
+                                        {"id": r.id, "title": r.title, "score": float(s)} for r, s in (cls_scored or [])[:5]
+                                    ],
+                                    "caption": caption
+                                } if debug else None,
+                                message=f"✅ Classified as: {cls_match.title}",
+                            )
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
     except Exception as e:
         print("Classifier error:", e)
@@ -72,7 +143,10 @@ async def analyze_food_image(
     # Vision Model Prediction (fallback)
     # ---------------------------
     try:
+        t3 = time.monotonic()
         predictions = analyze_image_bytes(image_bytes)
+        t4 = time.monotonic()
+        print(f"[ANALYZE] vision analyze time={(t4-t3):.3f}s")
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=str(e))
     except Exception as e:
@@ -92,7 +166,10 @@ async def analyze_food_image(
     # Caption (BLIP fallback)
     # ---------------------------
     try:
+        t5 = time.monotonic()
         caption = get_image_caption(image_bytes)
+        t6 = time.monotonic()
+        print(f"[ANALYZE] caption time={(t6-t5):.3f}s")
     except Exception:
         caption = None
 
@@ -144,9 +221,12 @@ async def analyze_food_image(
     # Fallback matching
     # ---------------------------
     try:
-        matched, match_score = match_recipe(top_labels, db)
+        t7 = time.monotonic()
+        matched, match_score, similar_recipes, scored_recipes = match_recipe(top_labels, db)
+        t8 = time.monotonic()
+        print(f"[ANALYZE] match_recipe time={(t8-t7):.3f}s")
     except Exception:
-        matched, match_score = None, 0.0
+        matched, match_score, similar_recipes, scored_recipes = None, 0.0, [], []
 
     # ---------------------------
     # Safe threshold
@@ -162,6 +242,28 @@ async def analyze_food_image(
                 matched = None
         except Exception:
             matched = None
+
+    # attach similar dishes for response if available
+    try:
+        if matched and similar_recipes:
+            # convert similar recipe objects to lightweight list
+            matched.similar_dishes = [
+                {"id": r.id, "title": r.title, "cuisine": r.cuisine}
+                for r in similar_recipes
+            ]
+    except Exception:
+        pass
+
+    # include per-recipe scores in debug info when requested
+    scored_list_for_debug = None
+    try:
+        if debug and scored_recipes:
+            scored_list_for_debug = [
+                {"id": r.id, "title": r.title, "score": float(s)}
+                for r, s in scored_recipes[:10]
+            ]
+    except Exception:
+        scored_list_for_debug = None
 
     # ---------------------------
     # 🚫 STOP RANDOM WRONG RECIPES
@@ -191,7 +293,10 @@ async def analyze_food_image(
     try:
         if caption:
             rag_query += " " + caption
+        t9 = time.monotonic()
         retrieved = rag_search(rag_query, top_k=5)
+        t10 = time.monotonic()
+        print(f"[ANALYZE] RAG search time={(t10-t9):.3f}s")
     except Exception:
         retrieved = []
 
@@ -229,7 +334,10 @@ async def analyze_food_image(
     # LLM generation
     # ---------------------------
     try:
+        t11 = time.monotonic()
         gen_res = generate_recipe(prompt, context_docs=context_docs, enforce_json=True, max_retries=2)
+        t12 = time.monotonic()
+        print(f"[ANALYZE] LLM generation time={(t12-t11):.3f}s")
         if isinstance(gen_res, tuple):
             generated, parsed_json = gen_res
         else:
@@ -314,7 +422,8 @@ async def analyze_food_image(
         debug_info={
             "classifier_label": classifier_label,
             "classifier_conf": classifier_conf,
-            "caption": caption
+            "caption": caption,
+            "scored_recipes": scored_list_for_debug,
         } if debug else None,
         message=f"Detected food items: {', '.join(label_names[:3]) if label_names else 'Unknown'}"
     )

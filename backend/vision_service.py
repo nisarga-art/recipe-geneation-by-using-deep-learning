@@ -17,10 +17,18 @@ _caption_model_name = "Salesforce/blip-image-captioning-base"
 def _load_caption_pipeline():
     global _caption_pipeline
     if _caption_pipeline is None:
+        # Only attempt to load BLIP pipeline if explicitly enabled in settings
+        try:
+            if not getattr(settings, "ENABLE_BLIP", False):
+                return None
+        except Exception:
+            return None
+
         try:
             from transformers import pipeline
             _caption_pipeline = pipeline("image-to-text", model=_caption_model_name)
-        except Exception:
+        except Exception as e:
+            print("Failed to initialize BLIP pipeline:", e)
             _caption_pipeline = None
     return _caption_pipeline
 
@@ -127,6 +135,18 @@ def analyze_image_bytes(image_bytes: bytes) -> List[Dict[str, Any]]:
     pipeline = _load_caption_pipeline()
 
     if pipeline is None:
+        # If BLIP is unavailable, try Clarifai fallback from clarifai_service
+        try:
+            from .clarifai_service import analyze_image_bytes as clarifai_analyze
+
+            # Clarifai implementation returns list[dict] like [{'name':..., 'value':...}]
+            clarifai_res = clarifai_analyze(image_bytes)
+            if clarifai_res:
+                return clarifai_res
+        except Exception as e:
+            print("Vision BLIP unavailable and Clarifai fallback failed:", e)
+
+        # final minimal fallback
         return [{"name": "food", "value": 0.5}]
 
     from PIL import Image
@@ -168,7 +188,7 @@ def analyze_image_bytes(image_bytes: bytes) -> List[Dict[str, Any]]:
 # RECIPE MATCHING (IMPROVED)
 # ---------------------------
 
-def match_recipe(labels: list, db) -> Tuple[Any, float]:
+def match_recipe(labels: list, db) -> Tuple[Any, float, list, list]:
 
     from .models import Recipe
 
@@ -185,6 +205,7 @@ def match_recipe(labels: list, db) -> Tuple[Any, float]:
 
     best_recipe = None
     best_score = 0.0
+    scored_recipes = []
 
     for recipe in all_recipes:
         title = (recipe.title or "").lower()
@@ -194,25 +215,41 @@ def match_recipe(labels: list, db) -> Tuple[Any, float]:
 
         for lab, conf in normalized:
 
-            # 🔥 STRONG TITLE MATCH
+            # 🔥 STRONG TITLE MATCH (exact containment)
             if lab in title:
                 score += 5 * conf
 
-            # label match
+            # fuzzy similarity against title (token-based)
+            try:
+                from difflib import SequenceMatcher
+
+                ratio = SequenceMatcher(None, lab, title).ratio()
+                # if fairly similar, boost score proportional to similarity
+                if ratio > 0.65:
+                    score += 4 * conf * ratio
+            except Exception:
+                pass
+
+            # label match against stored recipe labels
             for l in labels_db:
                 if lab == l:
                     score += 3 * conf
                 elif lab in l or l in lab:
                     score += 1.5 * conf
 
+        scored_recipes.append((recipe, score))
         if score > best_score:
             best_score = score
             best_recipe = recipe
 
     if best_score < 2:
-        return None, 0.0
+        return None, 0.0, [], []
 
-    return best_recipe, best_score
+    # sort recipes by score desc and return top similar excluding best
+    scored_recipes.sort(key=lambda x: x[1], reverse=True)
+    similar = [r for r, s in scored_recipes if r != best_recipe][:5]
+
+    return best_recipe, best_score, similar, scored_recipes
 
 
 # ---------------------------

@@ -31,6 +31,8 @@ class Settings(BaseSettings):
 
     # Google Vision: path to service account JSON (optional). If set, Vision API will be used.
     GOOGLE_APPLICATION_CREDENTIALS: str | None = None
+    # Enable locally-run BLIP caption pipeline (heavy: requires transformers & torch).
+    ENABLE_BLIP: bool = False
     # Synonyms JSON file path for ingredient/dish normalization (editable, no code changes required)
     SYNONYMS_FILE: str | None = "backend/synonyms.json"
     # Minimum match score required to accept an automatic database recipe match

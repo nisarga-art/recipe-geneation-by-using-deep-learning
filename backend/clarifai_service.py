@@ -109,7 +109,8 @@ def analyze_image_bytes(image_bytes: bytes) -> list[dict]:
             "Content-Type": "application/json",
         }
 
-        response = requests.post(CLARIFAI_URL, json=payload, headers=headers, timeout=30)
+        # faster fail on network issues; reduce timeout to avoid long blocking
+        response = requests.post(CLARIFAI_URL, json=payload, headers=headers, timeout=8)
 
         if response.status_code != 200:
             raise RuntimeError(f"Clarifai API error {response.status_code}: {response.text}")
@@ -208,7 +209,8 @@ def search_concepts_for_text(query: str) -> list[dict]:
 
         payload = {"inputs": [{"data": {"text": {"raw": query}}}]}
 
-        response = requests.post(CLARIFAI_TEXT_URL, json=payload, headers=headers, timeout=30)
+        # faster fail on network issues; reduce timeout to avoid long blocking
+        response = requests.post(CLARIFAI_TEXT_URL, json=payload, headers=headers, timeout=8)
 
         if response.status_code != 200:
             raise RuntimeError(f"Clarifai API error {response.status_code}: {response.text}")
