@@ -20,7 +20,7 @@ import ProfileDropdown from "../components/ProfileDropdown";
 import "../styles/GenerateRecipe.css";
 
 const cuisineOptions = ["Indian", "South Indian", "North Indian", "Indo-Chinese", "Italian", "Japanese", "Mexican"];
-const mealTypeOptions = ["Breakfast", "Lunch", "Dinner", "Snack"];
+const mealTypeOptions = ["Breakfast", "Lunch", "Dinner", "Snack", "Dessert"];
 const dietTypeOptions = ["Vegetarian", "Non Vegetarian", "Eggetarian", "Vegan"];
 const difficultyOptions = ["Easy", "Medium", "Hard"];
 const ingredientQuickPicks = [
@@ -59,6 +59,56 @@ const titleCase = (value) => value.replace(/\b\w/g, (char) => char.toUpperCase()
 const randomPick = (items) => items[Math.floor(Math.random() * items.length)];
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+const GENERATE_RECIPE_UI_STATE_KEY = "recipe-generator:ui-state:v1";
+
+const revokeIfBlobUrl = (url) => {
+  if (typeof url === "string" && url.startsWith("blob:")) {
+    URL.revokeObjectURL(url);
+  }
+};
+
+const readFileAsDataUrl = (file, maxDimension = 1200, quality = 0.84) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Unable to read file as data URL."));
+
+    reader.onload = () => {
+      const sourceDataUrl = String(reader.result || "");
+
+      if (!file.type.startsWith("image/")) {
+        resolve(sourceDataUrl);
+        return;
+      }
+
+      const image = new Image();
+      image.onload = () => {
+        const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d");
+
+        if (!context) {
+          resolve(sourceDataUrl);
+          return;
+        }
+
+        context.drawImage(image, 0, 0, width, height);
+
+        const compressedDataUrl = canvas.toDataURL("image/jpeg", quality);
+        resolve(compressedDataUrl || sourceDataUrl);
+      };
+
+      image.onerror = () => resolve(sourceDataUrl);
+      image.src = sourceDataUrl;
+    };
+
+    reader.readAsDataURL(file);
+  });
 
 let imageCaptionPipelinePromise = null;
 let zeroShotImagePipelinePromise = null;
@@ -101,6 +151,54 @@ const extractCaption = (result) => {
 };
 
 const dishProfiles = [
+  {
+    keywords: ["holige", "obbattu", "puran poli", "bobbatlu", "bele holige", "sweet flatbread"],
+    title: "Holige (Puran Poli)",
+    cuisine: "Indian",
+    mealType: "Dessert",
+    dietType: "Vegetarian",
+    difficulty: "Medium",
+    spiceLevel: 1,
+    maxCookTime: 55,
+    ingredients: ["chana dal", "jaggery", "cardamom", "maida", "ghee", "turmeric", "oil"],
+    notes: ["Traditional festive flatbread sweet cues detected.", "Best matched for Holige/Obbattu style preparation."],
+  },
+  {
+    keywords: ["mysore pak", "mysorepak", "mysore", "besan sweet", "gram flour sweet", "pak"],
+    title: "Mysore Pak",
+    cuisine: "Indian",
+    mealType: "Dessert",
+    dietType: "Vegetarian",
+    difficulty: "Medium",
+    spiceLevel: 1,
+    maxCookTime: 40,
+    ingredients: ["gram flour", "ghee", "sugar", "water", "cardamom"],
+    notes: ["Traditional South Indian sweet cues detected.", "Best matched for Mysore Pak style texture and plating."],
+  },
+  {
+    keywords: ["gulab", "jamun", "gulab jamun", "indian sweet", "dessert ball", "syrup sweet"],
+    title: "Gulab Jamun",
+    cuisine: "Indian",
+    mealType: "Dessert",
+    dietType: "Vegetarian",
+    difficulty: "Medium",
+    spiceLevel: 1,
+    maxCookTime: 45,
+    ingredients: ["khoya", "milk powder", "flour", "ghee", "sugar", "cardamom", "rose water"],
+    notes: ["Round syrup-soaked dessert cues detected.", "Best matched for Gulab Jamun style plating."],
+  },
+  {
+    keywords: ["pancake", "pancakes", "hotcake", "hotcakes", "flapjack", "stack", "syrup"],
+    title: "Fluffy Pancakes",
+    cuisine: "American",
+    mealType: "Breakfast",
+    dietType: "Vegetarian",
+    difficulty: "Easy",
+    spiceLevel: 1,
+    maxCookTime: 25,
+    ingredients: ["flour", "milk", "egg", "butter", "sugar", "baking powder", "maple syrup"],
+    notes: ["Pancake stack cues detected.", "Best matched for breakfast pancake plating."],
+  },
   {
     keywords: ["paneer", "cottage cheese", "paneer cubes", "indian cottage cheese"],
     title: "Paneer Butter Masala",
@@ -186,7 +284,7 @@ const dishProfiles = [
     notes: ["Warm bowl cues detected.", "Light broth profile matched."],
   },
   {
-    keywords: ["dosa", "idli", "south indian", "crepe", "savory pancake"],
+    keywords: ["dosa", "dose", "masala dosa", "masala dose", "idli", "south indian", "crepe", "savory pancake", "sambar", "chutney"],
     title: "Crispy Dosa Platter",
     cuisine: "South Indian",
     mealType: "Breakfast",
@@ -318,6 +416,91 @@ const inferDishProfile = (caption, fileName, zeroShotScores, previousTitle) => {
   };
 };
 
+const buildImageRecipeSteps = (analysis) => {
+  const signals = normalizeDishSignals(
+    `${analysis?.title ?? ""} ${analysis?.caption ?? ""} ${(analysis?.ingredients ?? []).join(" ")}`,
+  );
+
+  if (
+    signals.includes("holige") ||
+    signals.includes("obbattu") ||
+    signals.includes("puran poli") ||
+    signals.includes("bobbatlu")
+  ) {
+    return [
+      "Cook chana dal until soft, drain well, and mash smoothly.",
+      "Cook mashed dal with jaggery until thick; add cardamom and cool the filling.",
+      "Prepare a soft dough with flour, turmeric, oil, and water; rest it well.",
+      "Flatten a dough ball, place filling inside, and seal gently.",
+      "Roll carefully into a thin disc using oil or dry flour.",
+      "Cook on a hot tawa with ghee on both sides until golden spots appear, then serve warm.",
+    ];
+  }
+
+  if (signals.includes("mysore pak") || (signals.includes("mysore") && signals.includes("pak"))) {
+    return [
+      "Dry roast gram flour on low heat briefly and keep it ready.",
+      "Prepare sugar syrup with water until it reaches one-string consistency.",
+      "Add gram flour gradually into syrup while stirring continuously to avoid lumps.",
+      "Pour hot ghee in batches and keep mixing until the mixture turns frothy and porous.",
+      "Transfer to a greased tray, level quickly, and let it set partially.",
+      "Cut into pieces while warm, cool completely, and serve.",
+    ];
+  }
+
+  if (signals.includes("pancake") || signals.includes("flapjack") || signals.includes("hotcake")) {
+    return [
+      "Whisk flour, sugar, baking powder, and a pinch of salt in a bowl.",
+      "In another bowl, whisk milk, egg, and melted butter until smooth.",
+      "Fold wet mixture into dry ingredients gently; keep the batter slightly lumpy.",
+      "Heat a lightly greased pan on medium heat and pour small ladles of batter.",
+      "Flip when bubbles appear on top and cook the other side until golden.",
+      "Stack warm pancakes and serve with syrup, fruit, or butter.",
+    ];
+  }
+
+  if (signals.includes("dosa") || signals.includes("masala dosa") || signals.includes("sambar") || signals.includes("chutney")) {
+    return [
+      "Prepare dosa batter and stir well before use; keep a potato masala filling ready if needed.",
+      "Heat a flat tawa until medium-hot and lightly grease the surface.",
+      "Pour one ladle of batter and spread in a thin spiral to form a crisp dosa.",
+      "Drizzle a little oil or ghee on the edges and cook until the base turns golden.",
+      "Place masala filling in the center, fold the dosa, and cook briefly for extra crispness.",
+      "Serve immediately with coconut chutney and hot sambar.",
+    ];
+  }
+
+  if (signals.includes("gulab jamun") || (signals.includes("gulab") && signals.includes("jamun"))) {
+    return [
+      "Mix milk powder/khoya with flour and a little ghee to form a soft dough.",
+      "Add small amounts of milk to make a smooth, crack-free dough and rest it briefly.",
+      "Shape into small balls without cracks for even frying.",
+      "Fry on low heat until deep golden brown and cooked through.",
+      "Prepare warm sugar syrup with cardamom and optional rose water.",
+      "Soak fried jamuns in warm syrup for 1 to 2 hours before serving.",
+    ];
+  }
+
+  if (signals.includes("paneer") || signals.includes("masala") || signals.includes("curry")) {
+    return [
+      "Saute onion, ginger, and garlic until soft and aromatic.",
+      "Add tomato and dry spices; cook until the masala thickens and oil starts separating.",
+      "Blend or mash the masala for a smoother gravy if needed.",
+      "Return to pan, add water or cream, and simmer to desired consistency.",
+      "Add paneer or main ingredients and cook gently for a few minutes.",
+      "Finish with fresh herbs and serve hot with rice or flatbread.",
+    ];
+  }
+
+  return [
+    `Prep ${analysis?.ingredients?.[0] ?? "the main ingredient"} and supporting ingredients first.`,
+    "Heat the pan and build the flavor base with aromatics and seasoning.",
+    "Cook the core ingredients on medium heat until texture matches the dish style.",
+    "Adjust seasoning, moisture, and spice level based on taste.",
+    "Finish with garnish and serve immediately for best texture.",
+  ];
+};
+
 const estimateNutrition = (calories, highProtein, lowOil) => ({
   protein: Math.max(12, Math.round((calories * (highProtein ? 0.32 : 0.2)) / 4)),
   carbs: Math.max(18, Math.round((calories * 0.43) / 4)),
@@ -422,7 +605,7 @@ const toGeneratedRecipeFromAnalyzeApi = (payload, previewImageUrl, form) => {
   };
 };
 
-const buildRecipeFromImageAnalysis = (analysis) => {
+const buildRecipeFromImageAnalysis = (analysis, previewImageUrl = null) => {
   const estimatedCalories = Math.max(260, 250 + analysis.ingredients.length * 22 + analysis.spiceLevel * 10);
   const ingredientTitle = analysis.ingredients[0] ?? "dish";
 
@@ -439,20 +622,14 @@ const buildRecipeFromImageAnalysis = (analysis) => {
     estimatedCalories,
     macros: estimateNutrition(estimatedCalories, analysis.dietType === "Non Vegetarian", analysis.spiceLevel <= 2),
     ingredients: analysis.ingredients.map(titleCase),
-    steps: [
-      `Use the uploaded dish image as the visual reference and prep ${analysis.ingredients[0] ?? "the main ingredient"} first.`,
-      "Build the base aromatics and sauce to match the color, texture, and richness shown in the photo.",
-      "Cook until the dish reaches a similar consistency and visual finish to the reference image.",
-      "Balance salt, acid, and spice at the end so the flavor profile aligns with the captured caption.",
-      "Plate with a garnish that matches the dish style and serve immediately.",
-    ],
+    steps: buildImageRecipeSteps(analysis),
     tips: [
       `Image model: ${analysis.modelName}`,
       `Caption confidence: ${analysis.confidence}%`,
       ...analysis.notes,
       "If you want an exact match, upload a clearer, closer crop of the finished dish.",
     ],
-    imageUrl: `https://www.themealdb.com/images/ingredients/${encodeURIComponent(ingredientTitle)}.png`,
+    imageUrl: previewImageUrl || `https://www.themealdb.com/images/ingredients/${encodeURIComponent(ingredientTitle)}.png`,
     createdAt: new Date().toISOString(),
   };
 };
@@ -561,8 +738,16 @@ const toGeneratedRecipeFromApi = (meal, form) => {
 
 const normalizeText = (value) => `${value ?? ""}`.toLowerCase();
 
+const normalizeDishSignals = (value) =>
+  normalizeText(value)
+    .replace(/\bpuran\s+poli\b/g, "puran poli")
+    .replace(/\bbobbatlu\b/g, "obbattu")
+    .replace(/\bmysorepak\b/g, "mysore pak")
+    .replace(/\bmasala\s+dose\b/g, "masala dosa")
+    .replace(/\bdose\b/g, "dosa");
+
 const inferDominantProfileFromSignals = (signalText) => {
-  const normalized = normalizeText(signalText);
+  const normalized = normalizeDishSignals(signalText);
   let bestProfile = null;
   let bestScore = 0;
 
@@ -746,15 +931,65 @@ export default function GenerateRecipe() {
   }, [form]);
 
   useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(GENERATE_RECIPE_UI_STATE_KEY);
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw);
+
+      if (parsed?.form && typeof parsed.form === "object") {
+        setForm((previous) => ({ ...previous, ...parsed.form }));
+      }
+
+      if (parsed?.generatedRecipe && typeof parsed.generatedRecipe === "object") {
+        setGeneratedRecipe(parsed.generatedRecipe);
+      }
+
+      if (typeof parsed?.uploadedImageName === "string" || parsed?.uploadedImageName === null) {
+        setUploadedImageName(parsed.uploadedImageName);
+      }
+
+      if (typeof parsed?.uploadedImagePreview === "string" || parsed?.uploadedImagePreview === null) {
+        uploadedImageUrlRef.current = parsed.uploadedImagePreview;
+        setUploadedImagePreview(parsed.uploadedImagePreview);
+      }
+
+      if (parsed?.uploadedImageAnalysis && typeof parsed.uploadedImageAnalysis === "object") {
+        setUploadedImageAnalysis(parsed.uploadedImageAnalysis);
+      }
+
+      if (parsed?.activeTab === "ingredients" || parsed?.activeTab === "image") {
+        setActiveTab(parsed.activeTab);
+      }
+    } catch {
+      // Ignore invalid persisted state and continue with defaults.
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const snapshot = {
+        form,
+        generatedRecipe,
+        uploadedImageName,
+        uploadedImagePreview,
+        uploadedImageAnalysis,
+        activeTab,
+      };
+      window.localStorage.setItem(GENERATE_RECIPE_UI_STATE_KEY, JSON.stringify(snapshot));
+    } catch {
+      // Storage can fail for large images or restricted browser settings.
+    }
+  }, [form, generatedRecipe, uploadedImageName, uploadedImagePreview, uploadedImageAnalysis, activeTab]);
+
+  useEffect(() => {
     if (!notice) return undefined;
     const timer = window.setTimeout(() => setNotice(null), 3000);
     return () => window.clearTimeout(timer);
   }, [notice]);
 
   useEffect(() => () => {
-    if (uploadedImageUrlRef.current) {
-      URL.revokeObjectURL(uploadedImageUrlRef.current);
-    }
+    revokeIfBlobUrl(uploadedImageUrlRef.current);
   }, []);
 
   const canGenerate = useMemo(() => form.ingredientsText.trim().length > 0, [form.ingredientsText]);
@@ -769,6 +1004,14 @@ export default function GenerateRecipe() {
 
   const runGeneration = async (inputForm) => {
     const formToUse = inputForm && typeof inputForm === "object" && "ingredientsText" in inputForm ? inputForm : formRef.current;
+
+    if (activeTab === "image" && uploadedImageAnalysis) {
+      const recipeFromImage = buildRecipeFromImageAnalysis(uploadedImageAnalysis, uploadedImagePreview);
+      setGeneratedRecipe(recipeFromImage);
+      setLastSavedRecipeId(null);
+      showNotice("success", `${recipeFromImage.title} refreshed from uploaded image analysis.`);
+      return;
+    }
 
     if (!formToUse?.ingredientsText?.trim()) {
       showNotice("error", "Please enter at least one ingredient to generate a recipe.");
@@ -825,10 +1068,8 @@ export default function GenerateRecipe() {
   };
 
   const clearImageAnalysis = () => {
-    if (uploadedImageUrlRef.current) {
-      URL.revokeObjectURL(uploadedImageUrlRef.current);
-      uploadedImageUrlRef.current = null;
-    }
+    revokeIfBlobUrl(uploadedImageUrlRef.current);
+    uploadedImageUrlRef.current = null;
 
     if (imageInputRef.current) {
       imageInputRef.current.value = "";
@@ -843,10 +1084,8 @@ export default function GenerateRecipe() {
     setIsAnalyzingImage(true);
 
     try {
-      const previewUrl = URL.createObjectURL(file);
-      if (uploadedImageUrlRef.current) {
-        URL.revokeObjectURL(uploadedImageUrlRef.current);
-      }
+      const previewUrl = await readFileAsDataUrl(file);
+      revokeIfBlobUrl(uploadedImageUrlRef.current);
       uploadedImageUrlRef.current = previewUrl;
       setUploadedImagePreview(previewUrl);
       setUploadedImageName(file.name);
@@ -902,7 +1141,7 @@ export default function GenerateRecipe() {
             caption: payload?.debug_info?.caption || signalText,
           };
 
-          const correctedRecipe = buildRecipeFromImageAnalysis(correctedAnalysis);
+          const correctedRecipe = buildRecipeFromImageAnalysis(correctedAnalysis, previewUrl);
           recipe = {
             ...correctedRecipe,
             imageUrl: previewUrl,
@@ -959,7 +1198,7 @@ export default function GenerateRecipe() {
       const analysis = inferDishProfile(caption, file.name, zeroShotScores, generatedRecipe?.title ?? null);
       setUploadedImageAnalysis(analysis);
 
-      const recipe = buildRecipeFromImageAnalysis(analysis);
+      const recipe = buildRecipeFromImageAnalysis(analysis, previewUrl);
       setGeneratedRecipe(recipe);
       setLastSavedRecipeId(null);
 

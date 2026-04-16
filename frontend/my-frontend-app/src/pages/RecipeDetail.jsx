@@ -39,6 +39,189 @@ function asArray(value) {
   return [];
 }
 
+function normalizeRecipeKey(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const EXACT_RECIPE_DETAILS = {
+  "pav bhaji": {
+    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Bambayya_Pav_bhaji.jpg/640px-Bambayya_Pav_bhaji.jpg",
+    steps: [
+      "Boil mixed vegetables and mash them well.",
+      "Saute onion, tomato, and pav bhaji masala in butter.",
+      "Add mashed vegetables and simmer until thick.",
+      "Toast pav buns with butter on a hot tawa.",
+      "Serve with lemon, chopped onion, and extra butter.",
+    ],
+  },
+  "dal makhani": {
+    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Dal_Makhani.jpg/640px-Dal_Makhani.jpg",
+    steps: [
+      "Soak urad dal and rajma overnight and pressure cook until soft.",
+      "Cook onion, ginger, garlic, and tomato with spices.",
+      "Add cooked lentils and simmer on low heat.",
+      "Stir in butter and cream; cook until rich and creamy.",
+      "Finish with kasuri methi and serve hot.",
+    ],
+  },
+  "aloo gobi": {
+    image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=900&q=80&auto=format&fit=crop",
+    steps: [
+      "Saute cumin, onion, ginger, and garlic in oil.",
+      "Add potato, cauliflower, and dry spices.",
+      "Cover and cook until vegetables are tender.",
+      "Adjust seasoning and finish with coriander leaves.",
+      "Serve hot with roti or rice.",
+    ],
+  },
+  "samosa": {
+    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cb/Samosachutney.jpg/640px-Samosachutney.jpg",
+    steps: [
+      "Prepare spiced potato-pea filling.",
+      "Knead dough with flour, oil, and salt; rest it.",
+      "Shape cones, fill them, and seal edges well.",
+      "Deep-fry on medium-low heat until golden and crisp.",
+      "Serve with mint or tamarind chutney.",
+    ],
+  },
+  "masala dosa": {
+    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Rameshwaram_Cafe_Dosa.jpg/330px-Rameshwaram_Cafe_Dosa.jpg",
+    steps: [
+      "Prepare dosa batter and potato masala filling in advance.",
+      "Heat a flat tawa and spread one ladle of batter into a thin dosa.",
+      "Drizzle oil or ghee and cook until edges are crisp and golden.",
+      "Place masala filling in the center and fold the dosa.",
+      "Serve immediately with coconut chutney and hot sambar.",
+    ],
+  },
+  "crispy dosa platter": {
+    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Rameshwaram_Cafe_Dosa.jpg/330px-Rameshwaram_Cafe_Dosa.jpg",
+    steps: [
+      "Prepare dosa batter and stir until smooth before cooking.",
+      "Spread batter evenly on a hot greased tawa.",
+      "Cook until the base turns crisp and golden.",
+      "Add filling if needed, fold, and cook briefly.",
+      "Serve hot with chutney and sambar.",
+    ],
+  },
+  "gulab jamun": {
+    image: "https://images.unsplash.com/photo-1604908177522-8b4a5f7f28a6?w=900&q=80&auto=format&fit=crop",
+    steps: [
+      "Mix milk solids with flour and ghee to form a soft smooth dough.",
+      "Shape small crack-free balls and keep covered.",
+      "Fry slowly on low heat until deep golden brown.",
+      "Prepare warm sugar syrup flavored with cardamom.",
+      "Soak fried jamuns in syrup for 1 to 2 hours before serving.",
+    ],
+  },
+  "paneer butter masala": {
+    image: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/Shahi_panner.jpg/330px-Shahi_panner.jpg",
+    steps: [
+      "Saute onion, garlic, ginger, and tomato until soft.",
+      "Blend to a smooth puree and return it to the pan.",
+      "Cook with butter and spices until aromatic and glossy.",
+      "Add cream and paneer cubes; simmer for a few minutes.",
+      "Finish with kasuri methi and serve hot.",
+    ],
+  },
+  "matar paneer": {
+    image: "https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=900&q=80&auto=format&fit=crop",
+    steps: [
+      "Build a masala base with onion, tomato, ginger, garlic, and spices.",
+      "Add peas and simmer until tender.",
+      "Add paneer cubes and cook gently on low heat.",
+      "Adjust salt and finish with garam masala.",
+      "Serve hot with roti, naan, or rice.",
+    ],
+  },
+  "fluffy pancakes": {
+    image: "https://images.unsplash.com/photo-1528207776546-365bb710ee93?w=900&q=80&auto=format&fit=crop",
+    steps: [
+      "Whisk flour, sugar, and baking powder in one bowl.",
+      "Whisk milk, egg, and melted butter in another bowl.",
+      "Fold wet ingredients into dry ingredients gently.",
+      "Cook batter on a hot greased pan until bubbles form.",
+      "Flip, cook until golden, and serve with syrup.",
+    ],
+  },
+};
+
+const RECIPE_IMAGE_KEYWORD_MAP = {
+  dosa: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Rameshwaram_Cafe_Dosa.jpg/330px-Rameshwaram_Cafe_Dosa.jpg",
+  paneer: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/Shahi_panner.jpg/330px-Shahi_panner.jpg",
+  biryani: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/%22Hyderabadi_Dum_Biryani%22.jpg/330px-%22Hyderabadi_Dum_Biryani%22.jpg",
+  pancake: "https://images.unsplash.com/photo-1528207776546-365bb710ee93?w=900&q=80&auto=format&fit=crop",
+  gulab: "https://images.unsplash.com/photo-1604908177522-8b4a5f7f28a6?w=900&q=80&auto=format&fit=crop",
+  pav: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Bambayya_Pav_bhaji.jpg/640px-Bambayya_Pav_bhaji.jpg",
+  makhani: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Dal_Makhani.jpg/640px-Dal_Makhani.jpg",
+  samosa: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cb/Samosachutney.jpg/640px-Samosachutney.jpg",
+  taco: "https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?w=900&q=80&auto=format&fit=crop",
+  burger: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=900&q=80&auto=format&fit=crop",
+  soup: "https://images.unsplash.com/photo-1547592180-85f173990554?w=900&q=80&auto=format&fit=crop",
+};
+
+function resolveTitleImage(title, currentImage) {
+  const exact = getExactRecipeDetails(title);
+  if (exact?.image) {
+    return exact.image;
+  }
+
+  const key = normalizeRecipeKey(title);
+  for (const [keyword, mappedImage] of Object.entries(RECIPE_IMAGE_KEYWORD_MAP)) {
+    if (key.includes(keyword)) {
+      return mappedImage;
+    }
+  }
+
+  return currentImage;
+}
+
+function getExactRecipeDetails(title) {
+  const key = normalizeRecipeKey(title);
+  if (EXACT_RECIPE_DETAILS[key]) {
+    return EXACT_RECIPE_DETAILS[key];
+  }
+
+  const stripped = key
+    .replace(/\bregenerated\b/g, "")
+    .replace(/\brecipe\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (EXACT_RECIPE_DETAILS[stripped]) {
+    return EXACT_RECIPE_DETAILS[stripped];
+  }
+
+  const matchedKey = Object.keys(EXACT_RECIPE_DETAILS)
+    .sort((a, b) => b.length - a.length)
+    .find((mappedKey) => stripped.includes(mappedKey));
+
+  return matchedKey ? EXACT_RECIPE_DETAILS[matchedKey] : null;
+}
+
+function applyExactDetailsToRecipe(recipeLike) {
+  if (!recipeLike || typeof recipeLike !== "object") return recipeLike;
+  const exact = getExactRecipeDetails(recipeLike.title);
+
+  const existingSteps = asArray(recipeLike.steps);
+  const hasWeakSteps =
+    existingSteps.length === 0 ||
+    existingSteps.length <= 2 ||
+    existingSteps.some((step) => /detailed steps are being updated|prepare and portion|build a flavor base/i.test(step));
+
+  const resolvedSteps = exact && hasWeakSteps ? exact.steps : existingSteps;
+
+  return {
+    ...recipeLike,
+    image: resolveTitleImage(recipeLike.title, recipeLike.image),
+    steps: resolvedSteps,
+  };
+}
+
 function mapHealthTagToSlug(tag) {
   if (!tag) return null;
   const t = tag.toLowerCase();
@@ -240,7 +423,7 @@ function RecipeDetail() {
 
   const findDetailedLocalRecipe = (candidate) => {
     if (!candidate) return null;
-    if (hasFullRecipeDetails(candidate)) return candidate;
+    if (hasFullRecipeDetails(candidate)) return applyExactDetailsToRecipe(candidate);
 
     const candidateTitle = String(candidate.title || "").trim().toLowerCase();
     if (!candidateTitle) return candidate;
@@ -250,6 +433,15 @@ function RecipeDetail() {
     );
 
     if (!detailed) {
+      const exact = getExactRecipeDetails(candidateTitle);
+      if (exact) {
+        return {
+          ...candidate,
+          image: exact.image || candidate.image,
+          steps: exact.steps,
+        };
+      }
+
       const recipeTitle = String(candidate.title || "this recipe");
       const cuisineName = String(candidate.cuisine || "global");
       const baseProtein = /chicken|fish|prawn|shrimp|lamb|beef|egg|ramen/i.test(recipeTitle)
@@ -258,7 +450,7 @@ function RecipeDetail() {
           ? "Plant protein"
           : "Main ingredient";
 
-      return {
+      return applyExactDetailsToRecipe({
         ...candidate,
         ingredients: {
           available: [
@@ -275,10 +467,10 @@ function RecipeDetail() {
           "Add the main ingredients and cook until texture and doneness are right.",
           "Adjust seasoning, garnish, and serve warm.",
         ],
-      };
+      });
     }
 
-    return {
+    return applyExactDetailsToRecipe({
       ...detailed,
       id: candidate.id ?? detailed.id,
       image: candidate.image || detailed.image,
@@ -288,7 +480,7 @@ function RecipeDetail() {
       calories: candidate.calories ?? detailed.calories,
       difficulty: candidate.difficulty || detailed.difficulty,
       meal: candidate.meal || detailed.meal,
-    };
+    });
   };
 
   const buildRecipePayload = (data) => ({
@@ -373,7 +565,7 @@ function RecipeDetail() {
 
     const fallbackImage = "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200&q=80&auto=format&fit=crop";
 
-    const normalizedRecipe = {
+    const normalizedRecipe = applyExactDetailsToRecipe({
       ...data,
       image: data.image || fallbackImage,
       ingredients,
@@ -383,7 +575,7 @@ function RecipeDetail() {
       similarDishes: asArray(data.similar_dishes),
       cultural: data.cultural || "No cultural insight is available for this recipe yet.",
       pantryMatch: data.pantry_match ?? 0,
-    };
+    });
 
     setRecipe(normalizedRecipe);
     // Keep a fully normalized local copy to avoid render-time undefined field crashes.
