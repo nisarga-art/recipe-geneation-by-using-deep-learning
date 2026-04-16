@@ -1,18 +1,21 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import func
+
 from ..database import get_db
 from ..vision_service import analyze_image_bytes, match_recipe, get_image_caption
-from sqlalchemy import func
 from ..llm_service import generate_recipe
 from ..rag_service import search as rag_search
 from ..rag_service import build_index_from_recipes, save_index
 from ..schemas import AnalyzeResult
 from ..models import Recipe
-import json
 from ..config import settings
-from config import settings
-from backend.dish_classifier import load_model, class_names
+
+import json
+import re
+
+from backend.dish_classifier import predict
 
 router = APIRouter(prefix="/analyze", tags=["Analyze"])
 
@@ -26,7 +29,10 @@ async def analyze_food_image(
     db: Session = Depends(get_db),
     debug: bool = False,
 ):
+
+    # ---------------------------
     # Validate file type
+    # ---------------------------
     if file.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(
             status_code=400,
@@ -35,119 +41,194 @@ async def analyze_food_image(
 
     image_bytes = await file.read()
 
+    # ---------------------------
     # Validate file size
+    # ---------------------------
     if len(image_bytes) > MAX_FILE_SIZE_MB * 1024 * 1024:
         raise HTTPException(
             status_code=400,
             detail=f"File too large. Maximum allowed size is {MAX_FILE_SIZE_MB}MB.",
         )
 
-    # Call Clarifai
+    # ---------------------------
+    # CLASSIFIER (PRIMARY FIX)
+    # ---------------------------
+    classifier_label = None
+    classifier_conf = 0.0
+
+    try:
+        classifier_preds = predict(image_bytes, topk=3)
+        print("🔥 Classifier:", classifier_preds)
+
+        if classifier_preds:
+            best = classifier_preds[0]
+            classifier_label = best.get("name")
+            classifier_conf = float(best.get("value", 0.0))
+
+    except Exception as e:
+        print("Classifier error:", e)
+
+    # ---------------------------
+    # Vision Model Prediction (fallback)
+    # ---------------------------
     try:
         predictions = analyze_image_bytes(image_bytes)
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=str(e))
-    # Also generate a visual caption (BLIP) to improve retrieval and prompt grounding
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    # ---------------------------
+    # 🔥 FORCE CLASSIFIER OUTPUT
+    # ---------------------------
+    if classifier_label and classifier_conf > 0.6:
+        predictions = [{
+            "name": classifier_label.replace("_", " "),
+            "value": classifier_conf,
+            "source": "classifier"
+        }]
+
+    # ---------------------------
+    # Caption (BLIP fallback)
+    # ---------------------------
     try:
         caption = get_image_caption(image_bytes)
     except Exception:
         caption = None
-    # Top 10 labels with confidence >= 0.10
+
+    # ---------------------------
+    # Filter top labels
+    # ---------------------------
     top_labels = [p for p in predictions if p["value"] >= 0.10][:10]
     label_names = [p["name"] for p in top_labels]
     confidence_scores = [p["value"] for p in top_labels]
 
-    # Classifier-first exact mapping: if vision_service tagged a label as coming
-    # from the local classifier and its confidence >= configured threshold,
-    # try an exact DB title lookup. If lookup fails, return "Recipe not found".
+    # ---------------------------
+    # Classifier-first matching
+    # ---------------------------
     matched = None
     match_score = None
     classifier_candidate = None
+
     for p in top_labels:
         if p.get("source") == "classifier" and float(p.get("value", 0.0)) >= float(settings.CLASSIFIER_CONFIDENCE_THRESHOLD):
             classifier_candidate = p
             break
 
     if classifier_candidate is not None:
+
         cand = str(classifier_candidate.get("name", "")).replace("_", " ").strip().lower()
+        cand = cand.replace("  ", " ")
+
         try:
-            matched = db.query(Recipe).filter(func.lower(Recipe.title) == cand).first()
+            matched = db.query(Recipe).filter(func.lower(Recipe.title).contains(cand)).first()
         except Exception:
             matched = None
 
-        # If classifier predicted a recipe and we found an exact DB match, return it immediately.
         if matched is not None:
-            debug_info = ({"classifier_label": classifier_candidate, "caption": caption} if debug else None)
             return AnalyzeResult(
                 detected_labels=label_names,
                 confidence_scores=confidence_scores,
                 matched_recipe=matched,
                 generated_recipe=None,
                 generated_recipe_json=None,
-                debug_info=debug_info,
-                message=(f"Exact recipe found: {matched.title}"),
+                debug_info={
+                    "classifier_label": classifier_label,
+                    "classifier_conf": classifier_conf,
+                    "caption": caption
+                } if debug else None,
+                message=f"✅ Classified as: {matched.title}",
             )
 
-        if classifier_candidate and matched is None:
-            # Classifier is confident but no exact mapping exists — return explicit error
-            debug_info = (
-                {"classifier_label": classifier_candidate, "caption": caption} if debug else None
-            )
-            return JSONResponse(status_code=404, content={"error": "Recipe not found", "debug": debug_info})
-    else:
-        # Fallback: use scored matching based on detected labels
+    # ---------------------------
+    # Fallback matching
+    # ---------------------------
+    try:
         matched, match_score = match_recipe(top_labels, db)
-
-    # Enforce minimum match score threshold — treat as no match if below threshold
-    try:
-        if matched and (match_score is None or match_score < settings.MATCH_SCORE_THRESHOLD):
-            matched = None
     except Exception:
-        # if settings or match_score unavailable, ignore and continue
-        pass
+        matched, match_score = None, 0.0
 
-    # Retrieve related recipes from RAG index (if available) using labels + caption
-    retrieved = []
+    # ---------------------------
+    # Safe threshold
+    # ---------------------------
     try:
-        rag_query = " ".join(label_names)
+        threshold = float(settings.MATCH_SCORE_THRESHOLD)
+    except Exception:
+        threshold = 0.0
+
+    if matched and match_score is not None:
+        try:
+            if float(match_score) < threshold:
+                matched = None
+        except Exception:
+            matched = None
+
+    # ---------------------------
+    # 🚫 STOP RANDOM WRONG RECIPES
+    # ---------------------------
+    if not matched and classifier_conf < 0.6:
+        return AnalyzeResult(
+            detected_labels=label_names,
+            confidence_scores=confidence_scores,
+            matched_recipe=None,
+            generated_recipe=None,
+            generated_recipe_json=None,
+            debug_info={
+                "classifier_label": classifier_label,
+                "classifier_conf": classifier_conf,
+                "reason": "low confidence",
+                "caption": caption
+            } if debug else None,
+            message="❌ Could not confidently detect dish. Try clearer image."
+        )
+
+    # ---------------------------
+    # RAG retrieval
+    # ---------------------------
+    retrieved = []
+    rag_query = " ".join(label_names)
+
+    try:
         if caption:
-            rag_query = rag_query + " " + caption
+            rag_query += " " + caption
         retrieved = rag_search(rag_query, top_k=5)
     except Exception:
         retrieved = []
 
-    # Build a prompt for Flan-T5 using detected labels and matched recipe context
+    # ---------------------------
+    # Prompt
+    # ---------------------------
     prompt_lines = [
-        "You are an expert chef. Given detected visual items and optional context, produce a complete recipe.",
-        f"Detected items: {', '.join(label_names)}.",
+        "You are an expert chef. Generate a recipe JSON.",
+        f"Detected items: {', '.join(label_names)}",
     ]
+
     if caption:
-        prompt_lines.append(f"Image caption: {caption}.")
+        prompt_lines.append(f"Image caption: {caption}")
+
     if matched:
-        # include title and ingredients as context
-        prompt_lines.append(f"Matched recipe title: {matched.title}.")
-        if matched.ingredients:
-            prompt_lines.append(f"Matched ingredients: {matched.ingredients}.")
+        prompt_lines.append(f"Matched recipe title: {matched.title}")
 
     prompt_lines.append(
-        "Output a recipe as a single valid JSON object only (no explanatory text). The JSON schema must be exactly as follows:\n"
-        "{\n  \"title\": string,\n  \"servings\": string|int,\n  \"prep_time\": string,\n  \"cook_time\": string,\n  \"cuisine\": string,\n  \"ingredients\": [ { \"name\": string, \"quantity\": number|string, \"unit\": string }, ... ],\n  \"steps\": [string, ...],\n  \"equipment\": [string, ...],\n  \"tips\": [string, ...],\n  \"nutrition\": { \"calories\": number, \"protein\": number, \"carbs\": number, \"fat\": number }\n}\n"
-        "If a field is unknown, use null. Do not output any text before or after the JSON. Ensure valid JSON only."
+        "Return ONLY valid JSON with keys: title, servings, prep_time, cook_time, cuisine, ingredients, steps, equipment, tips, nutrition"
     )
 
     prompt = "\n".join(prompt_lines)
 
-    # include the retrieved recipe texts as context docs
+    # ---------------------------
+    # Context docs
+    # ---------------------------
     context_docs = []
     for r in retrieved:
-        src = r.get("source") or {}
-        title = src.get("title") or r.get("title")
-        ings = src.get("ingredients")
-        snippet = f"Title: {title}. Ingredients: {ings}."
-        context_docs.append(snippet)
+        if isinstance(r, dict):
+            title = r.get("title") or r.get("source", {}).get("title")
+            ings = r.get("ingredients")
+            context_docs.append(f"Title: {title}. Ingredients: {ings}.")
 
+    # ---------------------------
+    # LLM generation
+    # ---------------------------
     try:
-        # Request the LLM to output strict JSON (prompt enforces schema above)
         gen_res = generate_recipe(prompt, context_docs=context_docs, enforce_json=True, max_retries=2)
         if isinstance(gen_res, tuple):
             generated, parsed_json = gen_res
@@ -158,108 +239,82 @@ async def analyze_food_image(
         generated = f"Recipe generation failed: {e}"
         parsed_json = None
 
-    # Attempt to parse generated recipe JSON (strict JSON expected)
-    import json
-    import re
-
-    # parsed may already be available from LLM enforcement
+    # ---------------------------
+    # JSON parsing
+    # ---------------------------
     parsed = None
-    if 'parsed_json' in locals() and parsed_json:
+
+    if parsed_json:
         parsed = parsed_json
     else:
         try:
             parsed = json.loads(generated)
         except Exception:
-            # fallback to extracting JSON substring
             try:
-                match = re.search(r"\{(?:[^{}]|(?R))*\}", generated)
-            except re.error:
-                match = None
-            if match:
-                try:
-                    parsed = json.loads(match.group(0))
-                except Exception:
-                    parsed = None
-            else:
+                match = re.search(r"\{[\s\S]*\}", generated)
+                if match:
+                    parsed = json.loads(match.group())
+            except Exception:
                 parsed = None
 
-    try:
-        # create Recipe row using parsed JSON where available
-        title_val = None
-        ingredients_val = None
-        steps_val = None
-        cuisine_val = None
-        nutrition_val = None
-        if isinstance(parsed, dict):
-            title_val = parsed.get("title")
-            ingredients_val = parsed.get("ingredients")
-            steps_val = parsed.get("steps")
-            cuisine_val = parsed.get("cuisine")
-            nutrition_val = parsed.get("nutrition")
+    if not isinstance(parsed, dict):
+        parsed = {}
 
+    # ---------------------------
+    # Save to DB
+    # ---------------------------
+    new_recipe = None
+    try:
         new_recipe = Recipe(
-            title=(title_val or "AI Generated Recipe")[:200],
-            cuisine=cuisine_val,
+            title=(parsed.get("title") or "AI Generated Recipe")[:200],
+            cuisine=parsed.get("cuisine"),
             diet=None,
-            time=(parsed.get("prep_time") if isinstance(parsed, dict) else None),
-            calories=(nutrition_val.get("calories") if isinstance(nutrition_val, dict) else None),
+            time=parsed.get("prep_time"),
+            calories=(parsed.get("nutrition", {}) or {}).get("calories"),
             difficulty=None,
             meal=None,
             image=None,
             pantry_match=None,
             cultural=None,
-            ingredients=(ingredients_val if ingredients_val is not None else {"generated": None}),
-            nutrition=nutrition_val,
+            ingredients=parsed.get("ingredients") or {"generated": None},
+            nutrition=parsed.get("nutrition"),
             health_benefits=None,
-            steps=steps_val,
+            steps=parsed.get("steps"),
             similar_dishes=None,
             food_labels=label_names,
         )
+
         db.add(new_recipe)
         db.commit()
         db.refresh(new_recipe)
 
-        # Rebuild FAISS index from DB recipes (best-effort, may be slow)
         try:
             all_recipes = db.query(Recipe).all()
-            # convert to plain dicts expected by RAG builder
-            recipe_dicts = []
-            for r in all_recipes:
-                recipe_dicts.append({
-                    "id": r.id,
-                    "title": r.title,
-                    "ingredients": r.ingredients,
-                })
+            recipe_dicts = [
+                {"id": r.id, "title": r.title, "ingredients": r.ingredients}
+                for r in all_recipes
+            ]
             build_index_from_recipes(recipe_dicts)
             save_index("backend/faiss_index.bin", "backend/faiss_meta.json")
         except Exception:
             pass
+
     except Exception:
-        # swallow DB errors to keep endpoint responsive
         new_recipe = None
 
+    # ---------------------------
+    # RESPONSE
+    # ---------------------------
     return AnalyzeResult(
         detected_labels=label_names,
         confidence_scores=confidence_scores,
         matched_recipe=matched,
         generated_recipe=generated,
         generated_recipe_json=parsed,
-        debug_info=(
-            {
-                "caption": caption,
-                "rag_query": rag_query if 'rag_query' in locals() else None,
-                "retrieved_titles": [r.get('source', {}).get('title') or r.get('title') for r in retrieved],
-                "prompt": prompt,
-                "raw_generated": generated,
-                "parsed_json": parsed,
-                "matched_score": (match_score if 'match_score' in locals() else None),
-                "matched_id": (matched.id if matched else None),
-            }
-            if debug
-            else None
-        ),
-        message=(
-            f"Detected food items: {', '.join(label_names[:3])}. "
-            + (f"Best match: {matched.title}" if matched else "No matching recipe found in database.")
-        ),
+        debug_info={
+            "classifier_label": classifier_label,
+            "classifier_conf": classifier_conf,
+            "caption": caption
+        } if debug else None,
+        message=f"Detected food items: {', '.join(label_names[:3]) if label_names else 'Unknown'}"
     )
